@@ -3,12 +3,16 @@ from src.utils import *  # Utility functions for database operations
 from src.cortex_functions import *  # Cortex-specific helper functions
 from src.query_result_builder import *  # Query result formatting utilities
 from src.notification import *  # Notification/toast message utilities
+from src.cortex_functions import get_complete_result  # Import the complete function
 import json
+from snowflake.snowpark.files import SnowflakeFile
+import hashlib
 from pathlib import Path
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Dict, Any
 import requests
 import jwt
+import re
 try:
     import _snowflake
 except ImportError:
@@ -27,6 +31,7 @@ SETTINGS_TEMPLATE = {
     "tools": [],  # List of tool specifications
     "tool_resources": {},  # Configuration for each tool
     "response_instruction": "You will always maintain a friendly tone and provide concise response. When a user asks you a question, you will also be given excerpts from different sources provided by a search engine.",
+    "starter_questions": [],  # List of starter questions for the agent
 }
 
 def run_snowflake_query(session, query):
@@ -45,6 +50,375 @@ def run_snowflake_query(session, query):
     except Exception as e:
         st.error(f"Error executing SQL: {str(e)}")
         return None
+
+class StarterQuestionGenerator:
+    """Class for generating and caching starter questions for Cortex agents."""
+    
+    def __init__(self, session):
+        """Initialize the starter question generator.
+        
+        Args:
+            session: Snowflake session object
+        """
+        self.session = session
+        self.cache_table = "agent_starter_questions"
+        self.ensure_cache_table_exists()
+    
+    def ensure_cache_table_exists(self):
+        """Create the cache table for storing starter questions if it doesn't exist."""
+        try:
+            db = config["database"]
+            self.session.sql(f"""
+                CREATE TABLE IF NOT EXISTS {db}.PUBLIC.{self.cache_table} (
+                    agent_name VARCHAR,
+                    tool_signature VARCHAR,  -- Hash of tool configuration for cache invalidation
+                    questions ARRAY,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (agent_name, tool_signature)
+                )
+            """).collect()
+        except Exception as e:
+            st.error(f"Error creating cache table {self.cache_table}: {str(e)}")
+    
+    def _generate_tool_signature(self, tools, tool_resources):
+        """Generate a signature for the tool configuration to use for caching.
+        
+        Args:
+            tools (list): List of tool specifications
+            tool_resources (dict): Tool resources configuration
+            
+        Returns:
+            str: Hash signature of the configuration
+        """
+        import hashlib
+        config_str = json.dumps({"tools": tools, "tool_resources": tool_resources}, sort_keys=True)
+        return hashlib.md5(config_str.encode()).hexdigest()
+    
+    def _read_semantic_model_file(self, semantic_model_path):
+        """Read semantic model YAML file from Snowflake stage.
+        
+        Args:
+            semantic_model_path (str): Path to semantic model file (e.g., @DB.SCHEMA.STAGE/file.yaml)
+            
+        Returns:
+            str: Content of the semantic model file
+        """
+        try:
+            # Parse the stage path: @DB.SCHEMA.STAGE/file.yaml
+            # Need to separate stage name from file path for GET_PRESIGNED_URL
+            if '/' in semantic_model_path:
+                stage_name, file_path = semantic_model_path.rsplit('/', 1)
+            else:
+                # If no file path, assume it's just the stage
+                stage_name = semantic_model_path
+                file_path = ""
+            
+            # Get presigned URL for the file
+            presigned_query = f"SELECT GET_PRESIGNED_URL('{stage_name}', '{file_path}', 3600) as url"
+            presigned_result = self.session.sql(presigned_query).collect()
+            
+            if presigned_result and len(presigned_result) > 0:
+                presigned_url = presigned_result[0]['URL']
+                
+                # Use requests to fetch the actual file content
+                response = requests.get(presigned_url)
+                
+                if response.status_code == 200:
+                    content_str = response.text
+                    
+                    print("----------------------------------------")
+                    print("YAML content preview:", content_str[:500])
+                    
+                    # Debug: Show first 500 characters of the semantic model content
+                    if config.get("mode") == "debug":
+                        st.info(f"📄 Reading semantic model from {semantic_model_path}")
+                        st.text(f"Content preview (first 500 chars): {content_str[:500]}...")
+                    
+                    return content_str
+                else:
+                    st.warning(f"Failed to fetch file content. HTTP Status: {response.status_code}")
+                    return None
+            else:
+                st.warning(f"Could not get presigned URL for semantic model file: {semantic_model_path}")
+                return None
+            
+        except Exception as e:
+            st.warning(f"Error reading semantic model file {semantic_model_path}: {str(e)}")
+            # Return None so we can use default questions
+            return None
+    
+    def _generate_questions_for_sql_tool(self, semantic_model_content):
+        """Generate starter questions for Cortex Analyst SQL tool using semantic model.
+        
+        Args:
+            semantic_model_content (str): Content of the semantic model YAML file
+            
+        Returns:
+            list: List of generated starter questions
+        """
+        if not semantic_model_content:
+            return [
+                "What data is available in this database?",
+                "Show me the key metrics and dimensions",
+                "Generate a summary of the data model",
+                "What are the main tables and relationships?",
+                "Create a sample analysis query"
+            ]
+        
+        system_prompt = """You are a data analyst expert. Analyze the provided semantic model YAML file and generate 4 highly specific business questions that users would ask about this exact dataset.
+
+        Instructions:
+        1. Carefully examine the YAML structure for:
+           - Table names and their business purpose
+           - Column names that represent metrics, dimensions, dates
+           - Relationships between tables
+           - Time-based columns for trend analysis
+           - Categorical columns for grouping/filtering
+        
+        2. Generate questions that are:
+           - Specific to the actual table/column names found
+           - Business-focused (not technical)
+           - Actionable and insightful
+           - Using the exact terminology from the data model
+           - Mix of aggregations, trends, comparisons, and drill-downs
+        
+        3. Question types to include:
+           - Top/bottom rankings using actual metric names
+           - Time-based trends using actual date columns
+           - Comparisons across actual dimension values
+           - Performance analysis using real KPIs
+           - Distribution analysis of key metrics
+        
+        4. Format as a JSON array of strings only, no other text
+        
+        Example: ["What are the top 5 products by total_revenue?", "Show monthly sales_amount trends over the last year", "Which store_regions have the highest customer_satisfaction_score?"]"""
+        
+        user_prompt = f"""Analyze this semantic model YAML and extract specific table names, column names, and business concepts to create targeted starter questions:
+
+SEMANTIC MODEL:
+{semantic_model_content}
+
+Generate 4 specific business questions using the EXACT table names, column names, and metrics found in this YAML. Make the questions actionable and focused on the actual data structure provided."""
+        
+        try:
+            result = get_complete_result(
+                session=self.session,
+                model="llama3.1-70b",
+                prompt=user_prompt,
+                temperature=0.7,
+                max_tokens=1000,
+                guardrails=True,
+                system_prompt=system_prompt
+            )
+            
+            # Extract the generated text
+            if isinstance(result, dict) and 'choices' in result:
+                generated_text = result['choices'][0].get('messages', '')
+            else:
+                generated_text = str(result)
+            
+            # Debug: Show what the LLM generated
+            if config.get("mode") == "debug":
+                st.info("🤖 LLM Response for starter questions:")
+                st.text(f"Generated text: {generated_text}")
+            
+            # Try to parse as JSON array
+            try:
+                import re
+                # Find JSON array in the response - handle multiline arrays better
+                json_match = re.search(r'\[[\s\S]*?\]', generated_text)
+                if json_match:
+                    json_str = json_match.group().strip()
+                    questions = json.loads(json_str)
+                    if isinstance(questions, list):
+                        # Filter out empty or very short questions
+                        valid_questions = [q.strip(' "\'') for q in questions if isinstance(q, str) and len(q.strip(' "\'')) > 15]
+                        return valid_questions[:4]  # Limit to 4 questions
+            except Exception as json_error:
+                print(f"JSON parsing error: {json_error}")
+                pass
+                
+            # Fallback: split by lines and clean
+            lines = [line.strip() for line in generated_text.split('\n') if line.strip()]
+            questions = []
+            for line in lines:
+                # Remove bullets, numbers, quotes, and common prefixes
+                clean_line = re.sub(r'^[\d\.\-\*\+"]*\s*', '', line).strip(' "\'')
+                # Remove question numbering patterns like "1.", "Q1:", etc.
+                clean_line = re.sub(r'^(Q\d+[:.]?\s*|\d+[\.\)]\s*)', '', clean_line, flags=re.IGNORECASE)
+                
+                if clean_line and len(clean_line) > 15 and '?' in clean_line:
+                    # Ensure it's actually a question
+                    questions.append(clean_line)
+            
+            # If we still don't have good questions, try extracting from any text that looks like questions
+            if not questions:
+                question_pattern = r'["\']([^"\']*\?[^"\']*)["\'"]'
+                potential_questions = re.findall(question_pattern, generated_text)
+                questions = [q.strip() for q in potential_questions if len(q.strip()) > 15]
+            
+            return questions[:7] if questions else self._get_default_sql_questions()
+            
+        except Exception as e:
+            st.error(f"Error generating questions from semantic model: {str(e)}")
+            return self._get_default_sql_questions()
+    
+    def _generate_questions_for_search_tool(self, search_service_name):
+        """Generate starter questions for Cortex Search tool.
+        
+        Args:
+            search_service_name (str): Name of the search service
+            
+        Returns:
+            list: List of generated starter questions
+        """
+        return [
+            "What documents are available in this collection?",
+            "Search for information about key topics",
+            "Find relevant content related to my query",
+            "What are the main themes in the documents?",
+            "Search for specific policies or procedures"
+        ]
+    
+    def _get_default_sql_questions(self):
+        """Get default SQL questions when generation fails or semantic model is unavailable."""
+        return [
+            "What data is available in this database?",
+            "Show me the key metrics and KPIs",
+            "What are the main dimensions I can analyze by?", 
+            "Generate a summary of recent trends",
+            "What are the top performing categories?",
+            "Show me data distribution across different time periods",
+            "What patterns can you identify in the data?"
+        ]
+    
+    def generate_starter_questions(self, agent_name, tools, tool_resources):
+        """Generate starter questions for an agent based on its tools.
+        
+        Args:
+            agent_name (str): Name of the agent
+            tools (list): List of tool specifications
+            tool_resources (dict): Tool resources configuration
+            
+        Returns:
+            list: List of starter questions
+        """
+        # Check cache first
+        tool_signature = self._generate_tool_signature(tools, tool_resources)
+        cached_questions = self._get_cached_questions(agent_name, tool_signature)
+        
+        if cached_questions:
+            return cached_questions
+        
+        all_questions = []
+        
+        for tool in tools:
+            tool_name = tool["tool_spec"]["name"]
+            tool_type = tool["tool_spec"]["type"]
+            
+            if tool_type == "cortex_analyst_text_to_sql":
+                # Get semantic model content and generate questions
+                if tool_name in tool_resources:
+                    semantic_model_path = tool_resources[tool_name].get("semantic_model_file", "")
+                    if semantic_model_path:
+                        semantic_content = self._read_semantic_model_file(semantic_model_path)
+                        questions = self._generate_questions_for_sql_tool(semantic_content)
+                        all_questions.extend(questions)
+            
+            elif tool_type == "cortex_search":
+                # Generate search-related questions
+                if tool_name in tool_resources:
+                    search_service = tool_resources[tool_name].get("name", "")
+                    questions = self._generate_questions_for_search_tool(search_service)
+                    all_questions.extend(questions)
+        
+        # Remove duplicates while preserving order
+        unique_questions = []
+        seen = set()
+        for q in all_questions:
+            if q not in seen:
+                unique_questions.append(q)
+                seen.add(q)
+        
+        # Limit to 7 questions max
+        final_questions = unique_questions[:7]
+        
+        # Cache the results
+        self._cache_questions(agent_name, tool_signature, final_questions)
+        
+        return final_questions
+    
+    def _get_cached_questions(self, agent_name, tool_signature):
+        """Retrieve cached questions for an agent.
+        
+        Args:
+            agent_name (str): Name of the agent
+            tool_signature (str): Tool configuration signature
+            
+        Returns:
+            list: Cached questions or None if not found
+        """
+        try:
+            db = config["database"]
+            # Escape single quotes in parameters to prevent SQL injection
+            safe_agent_name = agent_name.replace("'", "''")
+            safe_tool_signature = tool_signature.replace("'", "''")
+            
+            query = f"""
+                SELECT questions FROM {db}.PUBLIC.{self.cache_table} 
+                WHERE agent_name = '{safe_agent_name}' AND tool_signature = '{safe_tool_signature}'
+            """
+            result = self.session.sql(query).collect()
+            if result:
+                # Parse the array from Snowflake
+                questions_array = result[0]['QUESTIONS']
+                if isinstance(questions_array, list):
+                    return questions_array
+                elif isinstance(questions_array, str):
+                    try:
+                        return json.loads(questions_array)
+                    except:
+                        pass
+            return None
+        except Exception as e:
+            st.error(f"Error retrieving cached questions: {str(e)}")
+            return None
+    
+    def _cache_questions(self, agent_name, tool_signature, questions):
+        """Cache generated questions for an agent.
+        
+        Args:
+            agent_name (str): Name of the agent
+            tool_signature (str): Tool configuration signature
+            questions (list): Questions to cache
+        """
+        try:
+            db = config["database"]
+            questions_json = json.dumps(questions)
+            # Escape single quotes in the JSON to prevent SQL injection
+            safe_questions_json = questions_json.replace("'", "''")
+            # Also escape single quotes in agent_name and tool_signature
+            safe_agent_name = agent_name.replace("'", "''")
+            safe_tool_signature = tool_signature.replace("'", "''")
+            
+            query = f"""
+                MERGE INTO {db}.PUBLIC.{self.cache_table} AS target
+                USING (SELECT 
+                    '{safe_agent_name}' as agent_name,
+                    '{safe_tool_signature}' as tool_signature,
+                    PARSE_JSON('{safe_questions_json}') as questions,
+                    CURRENT_TIMESTAMP as created_at
+                ) AS source
+                ON target.agent_name = source.agent_name AND target.tool_signature = source.tool_signature
+                WHEN MATCHED THEN
+                    UPDATE SET questions = source.questions, created_at = source.created_at
+                WHEN NOT MATCHED THEN
+                    INSERT (agent_name, tool_signature, questions, created_at)
+                    VALUES (source.agent_name, source.tool_signature, source.questions, source.created_at)
+            """
+            self.session.sql(query).collect()
+        except Exception as e:
+            st.error(f"Error caching questions: {str(e)}")
 
 class CortexAgent:
     """Class representing a Cortex AI agent with chat capabilities."""
@@ -406,14 +780,19 @@ class CortexAgentManager:
         """
         try:
             agent_data = agent.to_dict()
-            safe_settings = agent_data["settings"].replace("'", "''")  # Escape single quotes
+            # Escape single quotes in all string fields to prevent SQL injection
+            safe_name = agent_data["name"].replace("'", "''")
+            safe_settings = agent_data["settings"].replace("'", "''")
+            safe_created_at = str(agent_data["created_at"]).replace("'", "''")
+            safe_updated_at = str(agent_data["updated_at"]).replace("'", "''")
+            
             query = f"""
                 MERGE INTO {self.table_name} AS target
                 USING (SELECT 
-                    '{agent_data["name"]}' as name,
+                    '{safe_name}' as name,
                     '{safe_settings}' as settings,
-                    '{agent_data["created_at"]}' as created_at,
-                    '{agent_data["updated_at"]}' as updated_at
+                    '{safe_created_at}' as created_at,
+                    '{safe_updated_at}' as updated_at
                 ) AS source
                 ON target.name = source.name
                 WHEN MATCHED THEN
@@ -441,7 +820,9 @@ class CortexAgentManager:
             CortexAgent: Agent instance or None if not found
         """
         try:
-            query = f"SELECT * FROM {self.table_name} WHERE NAME = '{name}'"
+            # Escape single quotes in name to prevent SQL injection
+            safe_name = name.replace("'", "''")
+            query = f"SELECT * FROM {self.table_name} WHERE NAME = '{safe_name}'"
             result = self.session.sql(query).collect()
             return CortexAgent.from_dict(result[0]) if result else None
         except Exception as e:
@@ -677,6 +1058,13 @@ def display_cortex_agent(session):
         
         if st.button("Create", key="create_agent"):
             if name.strip():
+                # Generate starter questions based on tools
+                question_generator = StarterQuestionGenerator(session)
+                starter_questions = question_generator.generate_starter_questions(
+                    name, new_settings.get("tools", []), new_settings.get("tool_resources", {})
+                )
+                new_settings["starter_questions"] = starter_questions
+                
                 new_agent = CortexAgent(name=name, settings=new_settings)
                 new_settings["response_instruction"] = new_settings.get("response_instruction", "") + "Use that information to provide a summary that addresses the user's question. Question: {{.Question}}\n\nContext: {{.Context}}"
                 response_instruction = new_settings.get("response_instruction", "")
@@ -685,7 +1073,7 @@ def display_cortex_agent(session):
                     return
                 
                 if agent_manager.save_agent(new_agent):
-                    st.success(f"Agent {name} created successfully")
+                    st.success(f"Agent {name} created successfully with {len(starter_questions)} starter questions")
                     # Clean up session state
                     for key in list(st.session_state.keys()):
                         if key.startswith("Create"):
@@ -732,9 +1120,16 @@ def display_cortex_agent(session):
 
             if st.button("Update", key="edit_button"):
                 if new_name.strip():
+                    # Regenerate starter questions if tools have changed
+                    question_generator = StarterQuestionGenerator(session)
+                    starter_questions = question_generator.generate_starter_questions(
+                        new_name, updated_settings.get("tools", []), updated_settings.get("tool_resources", {})
+                    )
+                    updated_settings["starter_questions"] = starter_questions
+                    
                     updated_agent = agent.edit(session, new_name, updated_settings)
                     if agent_manager.save_agent(updated_agent):
-                        st.success(f"Agent '{new_name}' updated successfully!")
+                        st.success(f"Agent '{new_name}' updated successfully with {len(starter_questions)} starter questions!")
                         # Clean up session state
                         for key in list(st.session_state.keys()):
                             if key.startswith("Edit") or key == "edit_selected_agent":
@@ -743,38 +1138,3 @@ def display_cortex_agent(session):
                         st.error("Failed to update agent")
                 else:
                     st.error("Agent name and RSA public key fingerprint cannot be empty")
-
-    else:
-        # Chat Tab
-        st.subheader("Use Agent")
-        agents = agent_manager.get_all_agents()
-        chat_agent_name = st.selectbox("Select Agent", [agent.name for agent in agents], key="chat_agent_name")
-        if chat_agent_name:
-            agent = next(a for a in agents if a.name == chat_agent_name)
-            question = st.text_input("Ask a question", placeholder="Type your question here...", key="question")
-
-            if st.button("Send", key="send"):
-                if question.strip():
-                    with st.spinner("Processing your request..."):
-                        text, sql = agent.chat(session, question)
-                        if text:
-                            text = text.replace("【†", "[")
-                            text = text.replace("†】", "]")
-                            with st.chat_message("assistant"):
-                                st.markdown(text.replace("•", "\n\n"))  # Format bullet points
-                            st.session_state.setdefault("messages", []).append({"role": "assistant", "content": text})
-                        if sql:
-                            st.markdown("### Generated SQL")
-                            st.code(sql, language="sql")
-                            sql_result = run_snowflake_query(session, sql)
-                            # explanations = make_llm_call(session,"Explain the SQL Query", str(sql), "claude-3-5-sonnet")
-                            # st.write("### SQL Query Explanation")
-                            # st.markdown(explanations)
-                            if sql_result is not None:
-                                st.write("### Query Results")
-                                st.dataframe(sql_result)
-                                
-                            else:
-                                st.error("Error executing SQL query")
-                else:
-                    st.error("Question cannot be empty")

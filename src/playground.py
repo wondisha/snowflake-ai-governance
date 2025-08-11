@@ -1,4 +1,5 @@
 import streamlit as st
+# import streamlit.components.v1 as components
 import json
 from src.cortex_functions import *
 from snowflake.snowpark.exceptions import SnowparkSQLException
@@ -17,10 +18,219 @@ with open(config_path, "r") as f:
 if config.get("mode") == "debug":
     from streamlit_mic_recorder import speech_to_text
 
+# Voice output function - available in all modes
+@st.fragment
+def create_voice_output_button(text_content, button_key):
+    """
+    Creates a simple voice output button with pause/resume functionality
+    Args:
+        text_content (str): The text to convert to speech
+        button_key (str): Unique key for the button
+    """
+    if not text_content or not text_content.strip():
+        return
+    
+    # Clean text for better speech
+    clean_text = text_content.replace("**", "").replace("*", "").replace("`", "").replace("\n", " ").strip()
+    
+    # Simple button with pause/resume functionality
+    audio_html = f"""
+    <button id="voiceBtn_{button_key}" onclick="toggleSpeech_{button_key}()" 
+            style="background: transparent; 
+                   border: 1px solid white; 
+                   border-radius: 8px; 
+                   padding: 8px 12px; 
+                   cursor: pointer;
+                   transition: all 0.2s ease;
+                   font-size: 16px;"
+            onmouseover="this.style.backgroundColor='rgba(255,255,255,0.1)'"
+            onmouseout="this.style.backgroundColor='transparent'">
+        <span id="voiceIcon_{button_key}">🔊</span>
+    </button>
+
+    <script>
+        let utterance_{button_key} = null;
+        let isPlaying_{button_key} = false;
+        let isPaused_{button_key} = false;
+        
+        function toggleSpeech_{button_key}() {{
+            const icon = document.getElementById('voiceIcon_{button_key}');
+            
+            if (!window.speechSynthesis) {{
+                return;
+            }}
+            
+            // If currently playing, pause
+            if (isPlaying_{button_key} && !isPaused_{button_key}) {{
+                window.speechSynthesis.pause();
+                isPaused_{button_key} = true;
+                icon.innerHTML = '▶️';
+                return;
+            }}
+            
+            // If paused, resume
+            if (isPaused_{button_key}) {{
+                window.speechSynthesis.resume();
+                isPaused_{button_key} = false;
+                icon.innerHTML = '⏸️';
+                return;
+            }}
+            
+            // Start new speech
+            window.speechSynthesis.cancel();
+            utterance_{button_key} = new SpeechSynthesisUtterance(`{clean_text}`);
+            
+            utterance_{button_key}.onstart = function() {{
+                isPlaying_{button_key} = true;
+                isPaused_{button_key} = false;
+                icon.innerHTML = '⏸️';
+            }};
+            
+            utterance_{button_key}.onend = function() {{
+                isPlaying_{button_key} = false;
+                isPaused_{button_key} = false;
+                icon.innerHTML = '🔊';
+            }};
+            
+            utterance_{button_key}.onerror = function() {{
+                isPlaying_{button_key} = false;
+                isPaused_{button_key} = false;
+                icon.innerHTML = '🔊';
+            }};
+            
+            window.speechSynthesis.speak(utterance_{button_key});
+        }}
+    </script>
+    """
+    
+    # Display the simple button
+    st.components.v1.html(audio_html, height=40)
+    # st.markdown(audio_html, unsafe_allow_html=True)
+
+# Helper function to create inline label with voice button
+def create_inline_label_with_voice(label_text, text_content, button_key):
+    """
+    Creates an inline label with voice button like "Messages: 🔊"
+    """
+    if not text_content or not text_content.strip():
+        st.write(f"**{label_text}**")
+        return
+    
+    # Clean text for better speech
+    clean_text = text_content.replace("**", "").replace("*", "").replace("`", "").replace("\n", " ").strip()
+    
+    # Create inline label with voice button
+    inline_html = f"""
+    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+        <span style="color: white; 
+                     font-family: 'Segoe UI', 'Roboto', 'Arial', sans-serif; 
+                     font-weight: 600; 
+                     font-size: 16px; 
+                     letter-spacing: 0.5px;">
+            {label_text}
+        </span>
+        <button id="voiceBtn_{button_key}" onclick="toggleSpeech_{button_key}()" 
+                style="background: transparent; 
+                       border: 1px solid white; 
+                       border-radius: 6px; 
+                       padding: 4px 8px; 
+                       cursor: pointer;
+                       transition: all 0.2s ease;
+                       font-size: 14px;
+                       margin: 0;
+                       vertical-align: middle;"
+                onmouseover="this.style.backgroundColor='rgba(255,255,255,0.1)'"
+                onmouseout="this.style.backgroundColor='transparent'">
+            <span id="voiceIcon_{button_key}">🔊</span>
+        </button>
+    </div>
+
+    <script>
+        let utterance_{button_key} = null;
+        let isPlaying_{button_key} = false;
+        let isPaused_{button_key} = false;
+        
+        function toggleSpeech_{button_key}() {{
+            const icon = document.getElementById('voiceIcon_{button_key}');
+            
+            if (!window.speechSynthesis) {{
+                return;
+            }}
+            
+            // If currently playing, pause
+            if (isPlaying_{button_key} && !isPaused_{button_key}) {{
+                window.speechSynthesis.pause();
+                isPaused_{button_key} = true;
+                icon.innerHTML = '▶️';
+                return;
+            }}
+            
+            // If paused, resume
+            if (isPaused_{button_key}) {{
+                window.speechSynthesis.resume();
+                isPaused_{button_key} = false;
+                icon.innerHTML = '⏸️';
+                return;
+            }}
+            
+            // Start new speech
+            window.speechSynthesis.cancel();
+            utterance_{button_key} = new SpeechSynthesisUtterance(`{clean_text}`);
+            
+            utterance_{button_key}.onstart = function() {{
+                isPlaying_{button_key} = true;
+                isPaused_{button_key} = false;
+                icon.innerHTML = '⏸️';
+            }};
+            
+            utterance_{button_key}.onend = function() {{
+                isPlaying_{button_key} = false;
+                isPaused_{button_key} = false;
+                icon.innerHTML = '🔊';
+            }};
+            
+            utterance_{button_key}.onerror = function() {{
+                isPlaying_{button_key} = false;
+                isPaused_{button_key} = false;
+                icon.innerHTML = '🔊';
+            }};
+            
+            window.speechSynthesis.speak(utterance_{button_key});
+        }}
+    </script>
+    """
+    
+    # Display the inline label with voice button
+    st.components.v1.html(inline_html, height=50)
+    # st.markdown(inline_html, unsafe_allow_html=True)
+
 def execute_functionality(session, functionality, input_data, settings):
     """
     Executes the selected functionality in playground mode.
     """
+    # Check if audio input is available for this functionality (same logic as in playground)
+    has_audio_input = False
+    if config.get("mode") == "debug":
+        if functionality == "Complete":
+            has_audio_input = True
+        elif functionality == "Complete Multimodal":
+            has_audio_input = True
+        elif functionality == "Translate":
+            has_audio_input = True
+        elif functionality == "Extract":
+            has_audio_input = True
+        elif functionality == "Sentiment":
+            # Check if entity sentiment toggle is active
+            if not input_data.get("toggle", False):
+                has_audio_input = True
+        elif functionality == "AI Classify":
+            # Check input type for AI Classify
+            if settings and settings.get('input_type') == "Image":
+                has_audio_input = True
+        elif functionality == "AI Complete":
+            # AI Complete has audio input but no enhancement
+            has_audio_input = True
+
     if functionality == "Complete":
         result_json = get_complete_result(
             session, settings['model'], input_data['prompt'],
@@ -28,7 +238,9 @@ def execute_functionality(session, functionality, input_data, settings):
         )
         result_formatted = format_result(result_json)
         st.write("Completion Result")
-        st.write(f"**Messages:**")
+        # Display "Messages:" with inline voice button if audio input is available
+        
+        create_inline_label_with_voice("Messages:", result_formatted['messages'], "complete_result")
         st.success(result_formatted['messages'])
     
     elif functionality == "Complete Multimodal":
@@ -36,6 +248,9 @@ def execute_functionality(session, functionality, input_data, settings):
             session, settings['model'], input_data['prompt'], settings["stage"], settings["files"],
         )
         # st.write("Completion Multimodal Result")
+        # Add voice output button only if audio input is available - placed ABOVE the result
+        
+        create_voice_output_button(str(result), "complete_multimodal_result")
         if len(settings["files"]) == 1:
             path = f"@{settings['stage']}/{settings['files'][0]}"
             image = session.file.get_stream(path, decompress=False).read()
@@ -44,32 +259,45 @@ def execute_functionality(session, functionality, input_data, settings):
 
     elif functionality == "Translate":
         result = get_translation(session,input_data['text'], settings['source_lang'], settings['target_lang'])
-        st.write(f"**Translated Text:** {result}")
+        # Display inline label with voice button if audio input is available
+        
+        create_inline_label_with_voice("Translated Text:", str(result), "translate_result")
+        st.write(f"{result}")
 
     elif functionality == "Summarize":
         result = get_summary(session,input_data['text'])
         st.write(f"**Summary:** {result}")
+        # Note: Summarize doesn't have audio input, so no voice output button
 
     elif functionality == "Extract":
         result = get_extraction(session,input_data['text'], input_data['query'])
-        st.write(f"**Extracted Answer:** {result}")
+        # Display inline label with voice button if audio input is available
+        create_inline_label_with_voice("Extracted Answer:", str(result), "extract_result")
+        st.write(f"{result}")
 
     elif functionality == "Sentiment":
         if input_data["toggle"]:
             result = get_entity_sentiment(session,input_data['text'], input_data['entities'])
             st.write(f"**Entity Sentiment Analysis Result:** {result}")
+            # Entity sentiment doesn't have audio input, so no voice output
         else:
             result = get_sentiment(session,input_data['text'])
-            st.write(f"**Sentiment Analysis Result:** {result}")
+            # Display inline label with voice button if audio input is available
+            create_inline_label_with_voice("Sentiment Analysis Result:", str(result), "sentiment_result")
+            st.write(f"{result}")
+    
     elif functionality == "Classify Text":
         result = get_classification(session,input_data['text'], input_data['categories'])
         st.write(f"**Classification Result:** {result}")
+        # Note: Classify Text doesn't have audio input, so no voice output button
+    
     elif functionality == "Parse Document":
         result = get_parse_document(session, settings["stage"], settings["file"], input_data["mode"])
         st.write(f"**Parsed Document Result:**")
         # print(result)
         res = json.loads(result)
         st.write(res["content"])
+        # Note: Parse Document doesn't have audio input, so no voice output button
 
     elif functionality == "AI Similarity":
         try:
@@ -141,8 +369,15 @@ def execute_functionality(session, functionality, input_data, settings):
             try:
                 result_json = json.loads(result)
                 st.json(result_json)
+                # Add voice output button only if audio input is available (Image input type in debug mode)
+                if has_audio_input and settings['input_type'] == "Image":
+                    # Convert JSON result to readable text for voice output
+                    result_text = json.dumps(result_json, indent=2) if isinstance(result_json, dict) else str(result_json)
+                create_voice_output_button(result_text, "ai_classify_result")
             except json.JSONDecodeError:
                 st.write(result)
+                # Add voice output button only if audio input is available (Image input type in debug mode)
+                create_voice_output_button(str(result), "ai_classify_result")
         except ValueError as e:
             st.error(f"Input Error: {e}")
         except SnowparkSQLException as e:
@@ -198,7 +433,7 @@ def execute_functionality(session, functionality, input_data, settings):
         except Exception as e:
             st.error(f"Unexpected Error: {e}")
     
-    elif functionality == "AI AGG":
+    elif functionality == "AI Agg":
         try:
             if settings['input_type'] == "Text":
                 # Execute AI_AGG on text input
@@ -242,7 +477,7 @@ def execute_functionality(session, functionality, input_data, settings):
         except Exception as e:
             st.error(f"Unexpected Error: {e}")
 
-    elif functionality == "AI SUMMARIZE AGG":
+    elif functionality == "AI Summarize Agg":
         try:
             if settings['input_type'] == "Text":
                 # Execute AI_SUMMARIZE_AGG on text input
@@ -328,12 +563,24 @@ def execute_functionality(session, functionality, input_data, settings):
                 st.write("**Completion Result:**")
                 if settings.get('show_details') or settings.get('response_format'):
                     try:
-                        st.json(json.loads(result))
+                        result_json = json.loads(result)
+                        st.json(result_json)
+                        # Add voice output button only if audio input is available
+                        if has_audio_input:
+                            # Convert JSON result to readable text for voice output
+                            result_text = json.dumps(result_json, indent=2) if isinstance(result_json, dict) else str(result_json)
+                            create_voice_output_button(result_text, "ai_complete_text_result")
                     except json.JSONDecodeError:
                         st.write(result)
+                        # Add voice output button only if audio input is available
+                        if has_audio_input:
+                            create_voice_output_button(str(result), "ai_complete_text_result")
                 else:
                     result = result.replace('"', '')
                     st.write(result)
+                    # Add voice output button only if audio input is available
+                    if has_audio_input:
+                        create_voice_output_button(str(result), "ai_complete_text_result")
 
             elif settings['input_type'] == "Image":
                 # AI_COMPLETE with single image
@@ -354,9 +601,18 @@ def execute_functionality(session, functionality, input_data, settings):
                 st.image(image)
                 st.write("**Completion Result:**")
                 try:
-                    st.json(json.loads(result))
+                    result_json = json.loads(result)
+                    st.json(result_json)
+                    # Add voice output button only if audio input is available
+                    if has_audio_input:
+                        # Convert JSON result to readable text for voice output
+                        result_text = json.dumps(result_json, indent=2) if isinstance(result_json, dict) else str(result_json)
+                        create_voice_output_button(result_text, "ai_complete_image_result")
                 except json.JSONDecodeError:
                     st.write(result)
+                    # Add voice output button only if audio input is available
+                    if has_audio_input:
+                        create_voice_output_button(str(result), "ai_complete_image_result")
 
             else:  # Prompt Object
                 # AI_COMPLETE with prompt object
@@ -655,7 +911,7 @@ def get_functionality_settings(functionality, config, session=None):
                     return
                 st.warning("Ensure the stage is not encrypted with SNOWFLAKE_FULL, AWS_CSE, or AZURE_CSE, and is not a user or table stage.")
 
-    elif functionality == "AI AGG":
+    elif functionality == "AI Agg":
         col1, col2 = st.columns(2)
         cols = st.columns(3)
         
@@ -708,7 +964,7 @@ def get_functionality_settings(functionality, config, session=None):
             st.warning("Task description is required.")
             return None
 
-    elif functionality == "AI SUMMARIZE AGG":
+    elif functionality == "AI Summarize Agg":
         col1, col2 = st.columns(2)
         cols = st.columns(3)
         
@@ -942,7 +1198,7 @@ def display_playground(session):
     slide_window = 20
 
     # Use dynamic column layout based on whether Input Type is needed
-    functionality_list = ["Complete", "Complete Multimodal","Translate", "Summarize", "Extract", "Sentiment","Classify Text","Parse Document", "AI Complete", "AI Similarity", "AI Classify","AI Filter", "AI AGG","AI SUMMARIZE AGG"]
+    functionality_list = ["Complete", "Complete Multimodal","Translate", "Summarize", "Extract", "Sentiment","Classify Text","Parse Document", "AI Complete", "AI Similarity", "AI Classify","AI Filter", "AI Agg","AI Summarize Agg"]
     
     # First get initial selections
     initial_col1, initial_col2 = st.columns(2)
@@ -954,8 +1210,8 @@ def display_playground(session):
             functionality = st.selectbox("Choose functionality:", functionality_list)
         
         # Check if Input Type is needed for this functionality
-        needs_input_type = functionality in ["AI Classify", "AI Filter", "AI AGG", "AI SUMMARIZE AGG"]
-        
+        needs_input_type = functionality in ["AI Classify", "AI Filter", "AI Agg", "AI Summarize Agg"]
+
         if needs_input_type:
             # Add Input Type in a new row below
             input_type_col = st.columns(1)[0]
@@ -964,9 +1220,9 @@ def display_playground(session):
                     input_type_ai_classify = st.selectbox("Input Type", ["Text", "Image"], key="ai_classify_input_type")
                 elif functionality == "AI Filter":
                     input_type_ai_filter = st.selectbox("Input Type", ["Text", "Image"], key="ai_filter_input_type")
-                elif functionality == "AI AGG":
+                elif functionality == "AI Agg":
                     input_type_ai_agg = st.selectbox("Input Type", ["Text", "Table"], key="ai_agg_input_type")
-                elif functionality == "AI SUMMARIZE AGG":
+                elif functionality == "AI Summarize Agg":
                     input_type_ai_summarize_agg = st.selectbox("Input Type", ["Text", "Table"], key="ai_summarize_agg_input_type")
 
         if functionality != "Select Functionality":
@@ -1243,7 +1499,8 @@ def display_playground(session):
                     st.error(f"Error: {e}")
    
     elif choices == "Chat":
-        options = st.selectbox("Choose one of the options", ["Search Service","RAG","Cortex Agent"])
+        with initial_col2:
+            options = st.selectbox("Choose one of the options", ["Search Service","RAG","Cortex Agent"])
         
         if options == "Search Service":
             # Settings in expander
@@ -1487,7 +1744,85 @@ def display_playground(session):
             chat_agent_name = st.selectbox("Agent", [agent.name for agent in agents], key="chat_agent_name")
             if chat_agent_name:
                 agent = next(a for a in agents if a.name == chat_agent_name)
-                question = st.text_input("Ask a question", placeholder="Type your question here...", key="question")
+                
+                # Display starter questions as clickable buttons
+                starter_questions = agent.settings.get("starter_questions", [])
+                if starter_questions:
+                    st.markdown("**💡 Suggested questions to get started:**")
+                    
+                    # Add custom CSS for ChatGPT-style buttons
+                    st.markdown("""
+                    <style>
+                    .starter-question-button {
+                        background: transparent !important;
+                        border: 1px solid rgba(255, 255, 255, 0.2) !important;
+                        border-radius: 12px !important;
+                        padding: 12px 16px !important;
+                        margin: 8px 0 !important;
+                        color: inherit !important;
+                        font-size: 14px !important;
+                        line-height: 1.4 !important;
+                        text-align: left !important;
+                        height: auto !important;
+                        min-height: 50px !important;
+                        width: 100% !important;
+                        transition: all 0.2s ease !important;
+                        white-space: normal !important;
+                        overflow: visible !important;
+                    }
+                    .starter-question-button:hover {
+                        background: rgba(255, 255, 255, 0.05) !important;
+                        border-color: rgba(255, 255, 255, 0.3) !important;
+                    }
+                    .starter-question-button:focus {
+                        background: rgba(255, 255, 255, 0.05) !important;
+                        border-color: rgba(255, 255, 255, 0.3) !important;
+                        box-shadow: none !important;
+                    }
+                    /* Target the specific buttons */
+                    div[data-testid="column"] .stButton > button {
+                        background: transparent !important;
+                        border: 1px solid rgba(255, 255, 255, 0.2) !important;
+                        border-radius: 12px !important;
+                        padding: 12px 16px !important;
+                        margin: 8px 0 !important;
+                        color: inherit !important;
+                        font-size: 14px !important;
+                        line-height: 1.4 !important;
+                        text-align: left !important;
+                        height: auto !important;
+                        min-height: 50px !important;
+                        width: 100% !important;
+                        transition: all 0.2s ease !important;
+                        white-space: normal !important;
+                        overflow: visible !important;
+                    }
+                    div[data-testid="column"] .stButton > button:hover {
+                        background: rgba(255, 255, 255, 0.05) !important;
+                        border-color: rgba(255, 255, 255, 0.3) !important;
+                    }
+                    </style>
+                    """, unsafe_allow_html=True)
+                    
+                    # Create starter question buttons in two columns
+                    cols_per_row = 2
+                    for i in range(0, len(starter_questions), cols_per_row):
+                        cols = st.columns(cols_per_row)
+                        for j, col in enumerate(cols):
+                            if i + j < len(starter_questions):
+                                question_text = starter_questions[i + j]
+                                button_index = i + j
+                                
+                                with col:
+                                    if st.button(question_text, key=f"starter_q_{button_index}"):
+                                        st.session_state["question"] = question_text
+                                        st.rerun()
+                    
+                    st.divider()
+                
+                # Get the question from session state if it exists, otherwise empty string
+                question_value = st.session_state.get("question", "")
+                question = st.text_input("Ask a question", placeholder="Type your question here...", key="question", value=question_value)
 
                 if st.button("Send", key="send"):
                     if question.strip():
