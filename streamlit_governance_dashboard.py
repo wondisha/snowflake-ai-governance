@@ -21,7 +21,10 @@ st.markdown("**Real-time monitoring of governance, security, performance, and he
 # Get session - Snowsight handles this automatically
 try:
     session = get_active_session()
-    st.success("✅ Connected to Snowflake GOVERNANCE database")
+    # Set database and schema context
+    session.sql("USE DATABASE GOVERNANCE").collect()
+    session.sql("USE SCHEMA GOVERNANCE").collect()
+    st.success("✅ Connected to GOVERNANCE.GOVERNANCE")
 except Exception as e:
     st.error(f"Connection error: {str(e)}")
     st.stop()
@@ -43,28 +46,28 @@ if page == "Overview":
 
     try:
         # Total policies
-        result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.POLICIES").collect()
+        result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.GOVERNANCE.GOVERNANCE.POLICIES").collect()
         col1.metric("Active Policies", result[0]['COUNT'])
     except:
         col1.metric("Active Policies", "—")
 
     try:
         # Security rules
-        result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.SECURITY_RULES").collect()
+        result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.GOVERNANCE.SECURITY_RULES").collect()
         col2.metric("Security Rules", result[0]['COUNT'])
     except:
         col2.metric("Security Rules", "—")
 
     try:
         # Open incidents
-        result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.INCIDENTS WHERE STATUS IN ('open', 'in_progress')").collect()
+        result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.GOVERNANCE.INCIDENTS WHERE STATUS IN ('open', 'in_progress')").collect()
         col3.metric("Open Incidents", result[0]['COUNT'])
     except:
         col3.metric("Open Incidents", "—")
 
     try:
         # Pending approvals
-        result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.APPROVAL_REQUESTS WHERE STATUS = 'pending'").collect()
+        result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.GOVERNANCE.APPROVAL_REQUESTS WHERE STATUS = 'pending'").collect()
         col4.metric("Pending Approvals", result[0]['COUNT'])
     except:
         col4.metric("Pending Approvals", "—")
@@ -83,7 +86,7 @@ if page == "Overview":
                 ACTOR_EMAIL,
                 EVENT_TIMESTAMP,
                 STATUS
-            FROM GOVERNANCE.AUDIT_LOGS
+            FROM GOVERNANCE.GOVERNANCE.AUDIT_LOGS
             ORDER BY EVENT_TIMESTAMP DESC
             LIMIT 10
         """).to_pandas()
@@ -102,7 +105,7 @@ if page == "Overview":
                 LAST_SUCCESSFUL_EXECUTION,
                 ERROR_COUNT,
                 IS_ENABLED
-            FROM GOVERNANCE.AGENT_STATE
+            FROM GOVERNANCE.GOVERNANCE.AGENT_STATE
             ORDER BY LAST_SUCCESSFUL_EXECUTION DESC
         """).to_pandas()
         st.dataframe(df, use_container_width=True)
@@ -118,19 +121,19 @@ elif page == "Security":
     col1, col2, col3 = st.columns(3)
 
     try:
-        result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.SECURITY_RULES WHERE ENABLED = TRUE").collect()
+        result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.GOVERNANCE.SECURITY_RULES WHERE ENABLED = TRUE").collect()
         col1.metric("Enabled Rules", result[0]['COUNT'])
     except:
         col1.metric("Enabled Rules", "—")
 
     try:
-        result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.PII_DETECTIONS WHERE STATUS = 'detected'").collect()
+        result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.GOVERNANCE.PII_DETECTIONS WHERE STATUS = 'detected'").collect()
         col2.metric("PII Detections", result[0]['COUNT'])
     except:
         col2.metric("PII Detections", "—")
 
     try:
-        result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.AUDIT_LOGS WHERE EVENT_CATEGORY = 'security'").collect()
+        result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.GOVERNANCE.AUDIT_LOGS WHERE EVENT_CATEGORY = 'security'").collect()
         col3.metric("Security Events", result[0]['COUNT'])
     except:
         col3.metric("Security Events", "—")
@@ -148,7 +151,7 @@ elif page == "Security":
                 PII_TYPE,
                 CONFIDENCE_SCORE,
                 STATUS
-            FROM GOVERNANCE.PII_DETECTIONS
+            FROM GOVERNANCE.GOVERNANCE.PII_DETECTIONS
             ORDER BY DETECTED_AT DESC
             LIMIT 20
         """).to_pandas()
@@ -165,19 +168,19 @@ elif page == "Performance":
     col1, col2, col3 = st.columns(3)
 
     try:
-        result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.QUERY_ANALYSIS WHERE IS_OPTIMIZABLE = TRUE").collect()
+        result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.GOVERNANCE.QUERY_ANALYSIS WHERE IS_OPTIMIZABLE = TRUE").collect()
         col1.metric("Optimizable Queries", result[0]['COUNT'])
     except:
         col1.metric("Optimizable Queries", "—")
 
     try:
-        result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.PERFORMANCE_THRESHOLDS WHERE ENABLED = TRUE").collect()
+        result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.GOVERNANCE.PERFORMANCE_THRESHOLDS WHERE ENABLED = TRUE").collect()
         col2.metric("Active Thresholds", result[0]['COUNT'])
     except:
         col2.metric("Active Thresholds", "—")
 
     try:
-        result = session.sql("SELECT AVG(EXECUTION_TIME_SECONDS) as avg_time FROM GOVERNANCE.QUERY_ANALYSIS").collect()
+        result = session.sql("SELECT AVG(EXECUTION_TIME_SECONDS) as avg_time FROM GOVERNANCE.GOVERNANCE.QUERY_ANALYSIS").collect()
         avg_time = result[0]['AVG_TIME']
         col3.metric("Avg Query Time", f"{avg_time:.2f}s" if avg_time else "—")
     except:
@@ -196,7 +199,7 @@ elif page == "Performance":
                 DATA_SCANNED_GB,
                 PERFORMANCE_SCORE,
                 IS_OPTIMIZABLE
-            FROM GOVERNANCE.QUERY_ANALYSIS
+            FROM GOVERNANCE.GOVERNANCE.QUERY_ANALYSIS
             ORDER BY ANALYSIS_TIMESTAMP DESC
             LIMIT 20
         """).to_pandas()
@@ -213,20 +216,20 @@ elif page == "Cost":
     col1, col2, col3 = st.columns(3)
 
     try:
-        result = session.sql("SELECT SUM(CREDITS_USED) as total FROM GOVERNANCE.COST_TRACKING WHERE RECORDED_AT >= CURRENT_TIMESTAMP() - INTERVAL '7 days'").collect()
+        result = session.sql("SELECT SUM(CREDITS_USED) as total FROM GOVERNANCE.GOVERNANCE.COST_TRACKING WHERE RECORDED_AT >= CURRENT_TIMESTAMP() - INTERVAL '7 days'").collect()
         total = result[0]['TOTAL']
         col1.metric("Credits (7 days)", f"{total:.2f}" if total else "—")
     except:
         col1.metric("Credits (7 days)", "—")
 
     try:
-        result = session.sql("SELECT COUNT(DISTINCT WAREHOUSE_NAME) as count FROM GOVERNANCE.COST_TRACKING").collect()
+        result = session.sql("SELECT COUNT(DISTINCT WAREHOUSE_NAME) as count FROM GOVERNANCE.GOVERNANCE.COST_TRACKING").collect()
         col2.metric("Active Warehouses", result[0]['COUNT'])
     except:
         col2.metric("Active Warehouses", "—")
 
     try:
-        result = session.sql("SELECT COUNT(DISTINCT USER_EMAIL) as count FROM GOVERNANCE.COST_TRACKING").collect()
+        result = session.sql("SELECT COUNT(DISTINCT USER_EMAIL) as count FROM GOVERNANCE.GOVERNANCE.COST_TRACKING").collect()
         col3.metric("Active Users", result[0]['COUNT'])
     except:
         col3.metric("Active Users", "—")
@@ -241,7 +244,7 @@ elif page == "Cost":
                 COUNT(*) as query_count,
                 SUM(CREDITS_USED) as total_credits,
                 AVG(EXECUTION_TIME_SECONDS) as avg_time
-            FROM GOVERNANCE.COST_TRACKING
+            FROM GOVERNANCE.GOVERNANCE.COST_TRACKING
             WHERE RECORDED_AT >= CURRENT_TIMESTAMP() - INTERVAL '30 days'
             GROUP BY WAREHOUSE_NAME
             ORDER BY TOTAL_CREDITS DESC
@@ -264,7 +267,7 @@ elif page == "Health":
                 CPU_PERCENT,
                 MEMORY_PERCENT,
                 HEALTH_STATUS
-            FROM GOVERNANCE.WAREHOUSE_HEALTH
+            FROM GOVERNANCE.GOVERNANCE.WAREHOUSE_HEALTH
             ORDER BY METRIC_TIMESTAMP DESC
             LIMIT 20
         """).to_pandas()
@@ -281,19 +284,19 @@ elif page == "Incidents":
     col1, col2, col3 = st.columns(3)
 
     try:
-        result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.INCIDENTS WHERE STATUS IN ('open', 'in_progress')").collect()
+        result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.GOVERNANCE.INCIDENTS WHERE STATUS IN ('open', 'in_progress')").collect()
         col1.metric("Active Incidents", result[0]['COUNT'])
     except:
         col1.metric("Active Incidents", "—")
 
     try:
-        result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.INCIDENTS WHERE SEVERITY = 'critical'").collect()
+        result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.GOVERNANCE.INCIDENTS WHERE SEVERITY = 'critical'").collect()
         col2.metric("Critical", result[0]['COUNT'])
     except:
         col2.metric("Critical", "—")
 
     try:
-        result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.REMEDIATION_ACTIONS WHERE STATUS = 'success'").collect()
+        result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.GOVERNANCE.REMEDIATION_ACTIONS WHERE STATUS = 'success'").collect()
         col3.metric("Resolved", result[0]['COUNT'])
     except:
         col3.metric("Resolved", "—")
@@ -310,7 +313,7 @@ elif page == "Incidents":
                 DESCRIPTION,
                 DETECTED_TIMESTAMP,
                 STATUS
-            FROM GOVERNANCE.INCIDENTS
+            FROM GOVERNANCE.GOVERNANCE.INCIDENTS
             WHERE STATUS IN ('open', 'in_progress')
             ORDER BY DETECTED_TIMESTAMP DESC
         """).to_pandas()
@@ -333,7 +336,7 @@ elif page == "Agents":
                 EXECUTION_STATUS,
                 ERROR_COUNT,
                 IS_ENABLED
-            FROM GOVERNANCE.AGENT_STATE
+            FROM GOVERNANCE.GOVERNANCE.AGENT_STATE
             ORDER BY AGENT_TYPE, AGENT_NAME
         """).to_pandas()
         st.dataframe(df, use_container_width=True)
@@ -353,7 +356,7 @@ if page == "Overview":
 
     # Total policies
     try:
-        result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.POLICIES").collect()
+        result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.GOVERNANCE.POLICIES").collect()
         with col1:
             st.metric("Active Policies", result[0]['COUNT'])
     except:
@@ -361,7 +364,7 @@ if page == "Overview":
 
     # Security rules
     try:
-        result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.SECURITY_RULES").collect()
+        result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.GOVERNANCE.SECURITY_RULES").collect()
         with col2:
             st.metric("Security Rules", result[0]['COUNT'])
     except:
@@ -369,7 +372,7 @@ if page == "Overview":
 
     # Open incidents
     try:
-        result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.INCIDENTS WHERE STATUS IN ('open', 'in_progress')").collect()
+        result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.GOVERNANCE.INCIDENTS WHERE STATUS IN ('open', 'in_progress')").collect()
         with col3:
             st.metric("Open Incidents", result[0]['COUNT'])
     except:
@@ -377,7 +380,7 @@ if page == "Overview":
 
     # Pending approvals
     try:
-        result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.APPROVAL_REQUESTS WHERE STATUS = 'pending'").collect()
+        result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.GOVERNANCE.APPROVAL_REQUESTS WHERE STATUS = 'pending'").collect()
         with col4:
             st.metric("Pending Approvals", result[0]['COUNT'])
     except:
@@ -397,7 +400,7 @@ if page == "Overview":
                 ACTOR_EMAIL,
                 EVENT_TIMESTAMP,
                 STATUS
-            FROM GOVERNANCE.AUDIT_LOGS
+            FROM GOVERNANCE.GOVERNANCE.AUDIT_LOGS
             ORDER BY EVENT_TIMESTAMP DESC
             LIMIT 10
         """).to_pandas()
@@ -416,7 +419,7 @@ if page == "Overview":
                 LAST_SUCCESSFUL_EXECUTION,
                 ERROR_COUNT,
                 IS_ENABLED
-            FROM GOVERNANCE.AGENT_STATE
+            FROM GOVERNANCE.GOVERNANCE.AGENT_STATE
             ORDER BY LAST_SUCCESSFUL_EXECUTION DESC
         """).to_pandas()
         st.dataframe(df, use_container_width=True)
@@ -433,21 +436,21 @@ elif page == "Security":
 
     with col1:
         try:
-            result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.SECURITY_RULES WHERE ENABLED = TRUE").collect()
+            result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.GOVERNANCE.SECURITY_RULES WHERE ENABLED = TRUE").collect()
             st.metric("Enabled Rules", result[0]['COUNT'])
         except:
             st.metric("Enabled Rules", "—")
 
     with col2:
         try:
-            result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.PII_DETECTIONS WHERE STATUS = 'detected'").collect()
+            result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.GOVERNANCE.PII_DETECTIONS WHERE STATUS = 'detected'").collect()
             st.metric("PII Detections", result[0]['COUNT'])
         except:
             st.metric("PII Detections", "—")
 
     with col3:
         try:
-            result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.AUDIT_LOGS WHERE EVENT_CATEGORY = 'security'").collect()
+            result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.GOVERNANCE.AUDIT_LOGS WHERE EVENT_CATEGORY = 'security'").collect()
             st.metric("Security Events", result[0]['COUNT'])
         except:
             st.metric("Security Events", "—")
@@ -465,7 +468,7 @@ elif page == "Security":
                 PII_TYPE,
                 CONFIDENCE_SCORE,
                 STATUS
-            FROM GOVERNANCE.PII_DETECTIONS
+            FROM GOVERNANCE.GOVERNANCE.PII_DETECTIONS
             ORDER BY DETECTED_AT DESC
             LIMIT 20
         """).to_pandas()
@@ -483,21 +486,21 @@ elif page == "Performance":
 
     with col1:
         try:
-            result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.QUERY_ANALYSIS WHERE IS_OPTIMIZABLE = TRUE").collect()
+            result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.GOVERNANCE.QUERY_ANALYSIS WHERE IS_OPTIMIZABLE = TRUE").collect()
             st.metric("Optimizable Queries", result[0]['COUNT'])
         except:
             st.metric("Optimizable Queries", "—")
 
     with col2:
         try:
-            result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.PERFORMANCE_THRESHOLDS WHERE ENABLED = TRUE").collect()
+            result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.GOVERNANCE.PERFORMANCE_THRESHOLDS WHERE ENABLED = TRUE").collect()
             st.metric("Active Thresholds", result[0]['COUNT'])
         except:
             st.metric("Active Thresholds", "—")
 
     with col3:
         try:
-            result = session.sql("SELECT AVG(EXECUTION_TIME_SECONDS) as avg_time FROM GOVERNANCE.QUERY_ANALYSIS").collect()
+            result = session.sql("SELECT AVG(EXECUTION_TIME_SECONDS) as avg_time FROM GOVERNANCE.GOVERNANCE.QUERY_ANALYSIS").collect()
             avg_time = result[0]['AVG_TIME']
             st.metric("Avg Query Time", f"{avg_time:.2f}s" if avg_time else "—")
         except:
@@ -516,7 +519,7 @@ elif page == "Performance":
                 DATA_SCANNED_GB,
                 PERFORMANCE_SCORE,
                 IS_OPTIMIZABLE
-            FROM GOVERNANCE.QUERY_ANALYSIS
+            FROM GOVERNANCE.GOVERNANCE.QUERY_ANALYSIS
             WHERE ANALYSIS_TIMESTAMP >= CURRENT_TIMESTAMP() - INTERVAL '7 days'
             ORDER BY ANALYSIS_TIMESTAMP DESC
             LIMIT 20
@@ -535,7 +538,7 @@ elif page == "Cost":
 
     with col1:
         try:
-            result = session.sql("SELECT SUM(CREDITS_USED) as total FROM GOVERNANCE.COST_TRACKING WHERE RECORDED_AT >= CURRENT_TIMESTAMP() - INTERVAL '7 days'").collect()
+            result = session.sql("SELECT SUM(CREDITS_USED) as total FROM GOVERNANCE.GOVERNANCE.COST_TRACKING WHERE RECORDED_AT >= CURRENT_TIMESTAMP() - INTERVAL '7 days'").collect()
             total = result[0]['TOTAL']
             st.metric("Credits (7 days)", f"{total:.2f}" if total else "—")
         except:
@@ -543,14 +546,14 @@ elif page == "Cost":
 
     with col2:
         try:
-            result = session.sql("SELECT COUNT(DISTINCT WAREHOUSE_NAME) as count FROM GOVERNANCE.COST_TRACKING").collect()
+            result = session.sql("SELECT COUNT(DISTINCT WAREHOUSE_NAME) as count FROM GOVERNANCE.GOVERNANCE.COST_TRACKING").collect()
             st.metric("Active Warehouses", result[0]['COUNT'])
         except:
             st.metric("Active Warehouses", "—")
 
     with col3:
         try:
-            result = session.sql("SELECT COUNT(DISTINCT USER_EMAIL) as count FROM GOVERNANCE.COST_TRACKING").collect()
+            result = session.sql("SELECT COUNT(DISTINCT USER_EMAIL) as count FROM GOVERNANCE.GOVERNANCE.COST_TRACKING").collect()
             st.metric("Active Users", result[0]['COUNT'])
         except:
             st.metric("Active Users", "—")
@@ -566,7 +569,7 @@ elif page == "Cost":
                 SUM(CREDITS_USED) as total_credits,
                 AVG(EXECUTION_TIME_SECONDS) as avg_time,
                 SUM(DATA_SCANNED_GB) as total_data_scanned
-            FROM GOVERNANCE.COST_TRACKING
+            FROM GOVERNANCE.GOVERNANCE.COST_TRACKING
             WHERE RECORDED_AT >= CURRENT_TIMESTAMP() - INTERVAL '30 days'
             GROUP BY WAREHOUSE_NAME
             ORDER BY TOTAL_CREDITS DESC
@@ -593,7 +596,7 @@ elif page == "Health":
                 FAILED_QUERIES,
                 HEALTH_STATUS,
                 NOTES
-            FROM GOVERNANCE.WAREHOUSE_HEALTH
+            FROM GOVERNANCE.GOVERNANCE.WAREHOUSE_HEALTH
             ORDER BY METRIC_TIMESTAMP DESC
             LIMIT 20
         """).to_pandas()
@@ -622,21 +625,21 @@ elif page == "Incidents":
 
     with col1:
         try:
-            result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.INCIDENTS WHERE STATUS IN ('open', 'in_progress')").collect()
+            result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.GOVERNANCE.INCIDENTS WHERE STATUS IN ('open', 'in_progress')").collect()
             st.metric("Active Incidents", result[0]['COUNT'])
         except:
             st.metric("Active Incidents", "—")
 
     with col2:
         try:
-            result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.INCIDENTS WHERE SEVERITY = 'critical'").collect()
+            result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.GOVERNANCE.INCIDENTS WHERE SEVERITY = 'critical'").collect()
             st.metric("Critical", result[0]['COUNT'])
         except:
             st.metric("Critical", "—")
 
     with col3:
         try:
-            result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.REMEDIATION_ACTIONS WHERE STATUS = 'success'").collect()
+            result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.GOVERNANCE.REMEDIATION_ACTIONS WHERE STATUS = 'success'").collect()
             st.metric("Resolved", result[0]['COUNT'])
         except:
             st.metric("Resolved", "—")
@@ -655,7 +658,7 @@ elif page == "Incidents":
                 ASSIGNED_TO,
                 STATUS,
                 ESCALATION_COUNT
-            FROM GOVERNANCE.INCIDENTS
+            FROM GOVERNANCE.GOVERNANCE.INCIDENTS
             WHERE STATUS IN ('open', 'in_progress')
             ORDER BY DETECTED_TIMESTAMP DESC
         """).to_pandas()
@@ -681,7 +684,7 @@ elif page == "Agents":
                 ERROR_COUNT,
                 LAST_ERROR_MESSAGE,
                 IS_ENABLED
-            FROM GOVERNANCE.AGENT_STATE
+            FROM GOVERNANCE.GOVERNANCE.AGENT_STATE
             ORDER BY AGENT_TYPE, AGENT_NAME
         """).to_pandas()
         st.dataframe(df, use_container_width=True)
@@ -699,7 +702,7 @@ elif page == "Agents":
                 NEXT_SCHEDULED_RUN,
                 ERROR_COUNT,
                 DATEDIFF(hour, LAST_SUCCESSFUL_EXECUTION, CURRENT_TIMESTAMP()) as hours_since_success
-            FROM GOVERNANCE.AGENT_STATE
+            FROM GOVERNANCE.GOVERNANCE.AGENT_STATE
             ORDER BY LAST_SUCCESSFUL_EXECUTION DESC
         """).to_pandas()
         st.dataframe(df, use_container_width=True)
