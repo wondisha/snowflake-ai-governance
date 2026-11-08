@@ -1,0 +1,152 @@
+{
+  "snowflake": {
+    "account": "QZCIUOS-DB05264",
+    "user": "SFSESSIONUSER",
+    "password": "Snwe@73792026gabi",
+    "warehouse": "COMPUTE_WH",
+    "database": "GOVERNANCE",
+    "schema": "PUBLIC",
+    "role": "SYSADMIN",
+    "region": "us-west-2"
+  },
+  "deployment": {
+    "phases": [1, 2, 3, 4, 5],
+    "dry_run": false,
+    "skip_schema_creation": false,
+    "skip_agent_deployment": false,
+    "skip_validation": false,
+    "backup_before_deploy": true,
+    "parallel_phases": false
+  },
+  "phases": {
+    "phase1": {
+      "enabled": true,
+      "name": "Foundation",
+      "timeout_minutes": 15,
+      "components": [
+        "database_schema",
+        "snowpark_client",
+        "base_agent",
+        "security_agent",
+        "performance_agent",
+        "cost_agent",
+        "spillage_agent",
+        "health_agent",
+        "approval_workflow",
+        "orchestrator"
+      ]
+    },
+    "phase2": {
+      "enabled": true,
+      "name": "Automation & Integration",
+      "timeout_minutes": 20,
+      "components": [
+        "remediation_agent",
+        "workload_intelligence",
+        "data_governance_agent",
+        "slack_bot",
+        "rest_api",
+        "external_integrations"
+      ]
+    },
+    "phase3": {
+      "enabled": true,
+      "name": "ML & Intelligence",
+      "timeout_minutes": 15,
+      "components": [
+        "ml_anomaly_detection",
+        "cost_allocation_engine"
+      ]
+    },
+    "phase4": {
+      "enabled": true,
+      "name": "Enterprise Scale",
+      "timeout_minutes": 10,
+      "components": [
+        "advanced_ml_agent",
+        "multi_account_controller"
+      ]
+    },
+    "phase5": {
+      "enabled": true,
+      "name": "Autonomous & Predictive",
+      "timeout_minutes": 15,
+      "components": [
+        "autonomous_self_healing",
+        "predictive_intelligence",
+        "policy_as_code",
+        "natural_language_interface",
+        "multi_cloud_controller",
+        "observability_dashboards"
+      ]
+    }
+  },
+  "integrations": {
+    "slack": {
+      "enabled": false,
+      "bot_token": "xoxb-YOUR-TOKEN",
+      "app_token": "xapp-YOUR-TOKEN",
+      "channels": {
+        "alerts": "#governance-alerts",
+        "approvals": "#governance-approvals",
+        "status": "#governance-status"
+      }
+    },
+    "servicenow": {
+      "enabled": false,
+      "instance_url": "https://YOUR_INSTANCE.service-now.com",
+      "username": "YOUR_USERNAME",
+      "password": "YOUR_PASSWORD"
+    },
+    "datadog": {
+      "enabled": false,
+      "api_key": "YOUR_API_KEY",
+      "app_key": "YOUR_APP_KEY",
+      "site": "datadoghq.com"
+    },
+    "splunk": {
+      "enabled": false,
+      "hec_url": "https://YOUR_SPLUNK_INSTANCE:8088",
+      "hec_token": "YOUR_HEC_TOKEN"
+    },
+    "pagerduty": {
+      "enabled": false,
+      "api_key": "YOUR_API_KEY",
+      "escalation_policy_id": "YOUR_POLICY_ID"
+    }
+  },
+  "governance": {
+    "approval_sla_hours": {
+      "critical": 1,
+      "high": 2,
+      "medium": 4,
+      "low": 24
+    },
+    "autonomous_execution": {
+      "safe_actions_enabled": true,
+      "moderate_actions_enabled": true,
+      "risky_actions_enabled": false,
+      "dangerous_actions_enabled": false
+    },
+    "policies": {
+      "auto_load_templates": true,
+      "templates_directory": "policies/templates"
+    },
+    "predictive": {
+      "forecast_days": 14,
+      "confidence_threshold": 0.65,
+      "lookback_days": 30
+    }
+  },
+  "monitoring": {
+    "metrics_refresh_seconds": 300,
+    "log_level": "INFO",
+    "enable_performance_metrics": true,
+    "enable_audit_logging": true
+  },
+  "backup": {
+    "enabled": true,
+    "retention_days": 30,
+    "backup_schedule": "daily"
+  }
+}
