@@ -1,225 +1,422 @@
-# Snowflake AI Toolkit
+# ❄️ Snowflake AI Governance System
 
-Snowflake AI Toolkit is an AI Accelerator and Playground for enabling AI in Snowflake. It is a Plug and Play Streamlit-based Native App that lets you explore, learn, and rapidly prototype AI solutions powered by Snowflake's Cortex and AI Functions. In addition to these capabilities, the toolkit automatically sets up your environment and provides prebuilt use cases to try all Cortex features—from simple prompting to advanced agentic solutions.
+**Complete autonomous governance, security, performance, and health management for Snowflake**
 
-# Features
+---
 
-### Playground
+## 🎯 Overview
 
-An interactive environment where users can chat and experiment with Snowflake Cortex functions, test prompts, and explore Cortex capabilities. Supports both manual text entry and voice-to-text input for prompts across multiple functions—including Complete, Translate, Extract, Sentiment Analysis, and AI Complete (debug mode only). Additionally, audio output is available for responses, enabling users to listen to results as well as view them.
+An **enterprise-grade autonomous governance system** for Snowflake that automatically:
 
-### Build
+✅ Monitors & Optimizes - Real-time performance, cost, and health tracking  
+✅ Enforces Security - Access control, PII detection, spillage prevention  
+✅ Manages Resources - Auto-scale warehouses, suspend idle, abort runaway queries  
+✅ Prevents Breaches - Data spillage detection, user access monitoring  
+✅ Cleans Up Users - Auto-remove inactive users (90+ days)  
+✅ Alerts & Reports - Slack alerts, daily email reports, approval workflows  
 
-A dedicated section for constructing and deploying data pipelines and workflows using Snowflake Cortex's powerful AI capabilities, enabling seamless integration with your Snowflake databases and tables
+**Zero manual intervention required!** 🤖
 
-- Text completion and generation using the COMPLETE function
-- Retrieval-Augmented Generation (RAG) for question answering with your own data
-- Fine-tuning large language models on your custom datasets
+---
 
-### Search
+## 📊 Features
 
-Get a hybrid (vector and keyword) search engine on your text data in minutes,
+### 5 Autonomous Agents
 
-- Create and manage Cortex Search Service
-- Use Cortex Search for your RAG Application
-- Use Cortex Search Powered Chat
+- **Security Agent** - Access control & compliance
+- **Performance Agent** - Query & warehouse optimization
+- **Cost Agent** - Spending optimization
+- **Health Agent** - System monitoring
+- **Spillage Agent** - Data protection & PII detection
 
-### Agent
+### 8-Page Real-Time Dashboard
 
-Cortex Agents orchestrate across both structured and unstructured data sources to deliver insights.
+- Overview - System metrics & audit logs
+- Security - PII detection, security events
+- Performance - Query analysis, warehouse metrics
+- Cost - Credit tracking, cost per warehouse
+- Health - Warehouse health status
+- Incidents - Active incidents & remediation
+- Agents - Agent status & performance
+- Inactive Users - User lifecycle management (NEW!)
 
-- Create and Manage Cortex Agent Instances
-- Test the Agent against the Data
-- Utilize Cortex Search and Cortex Analyst through Agents
+### Integrations
 
-### Audio Input Integration
+- Slack alerts for critical incidents
+- Daily email governance reports
+- Risk-based approval workflows with SLA
+- Multi-environment configs (Dev/Staging/Prod)
+- Airflow DAG orchestration
+- dbt Cloud integration
 
-The Snowflake AI Toolkit now supports voice input across multiple functionalities, making it easier to interact with AI functions through speech (available in debug mode only):
+### User Lifecycle Management
 
-- **Voice-to-Text Conversion**: Convert spoken words directly into text inputs for various AI functions
-- **Multi-Function Support**: Available for Complete, Complete Multimodal, Translate, Extract, Sentiment Analysis, AI Classify (Image), and AI Complete functions
-- **Real-Time Processing**: Instant speech recognition with immediate text population in input fields
-- **User-Friendly Interface**: Microphone button (🎙️) positioned conveniently next to the Run button for seamless workflow
-- **Debug Mode Only**: Audio input feature is enabled only when `mode` is set to `"debug"` in `src/settings_config.json`
+- Auto-detection of 90+ day inactive users
+- Flexible removal: Approval-based OR Automatic
+- Auto-remediation: Revoke roles, disable, archive
+- Complete audit trail
 
-### Notification
+---
 
-- **Real-Time Updates**: Receive instant notifications for every function call and completion.
-- **Synchronous & Asynchronous Support**: Stay informed about both immediate and long-running processes, including RAG and fine-tuning tasks.
-- **Computation Details**: View token usage and token credit consumption for each operation.
-- **In-App Delivery**: All notifications appear directly within the application interface.
-- **Enhanced Transparency**: Get clear, timely feedback throughout all workflows.
+## 🚀 Quick Start (5 Minutes)
 
+### Step 1: Prerequisites
 
-## Prerequisites
+- Snowflake account (Pro/Business Critical)
+- Python 3.8+
+- Git (optional)
+- Snowsight access
 
-Before you begin, ensure you have met the following requirements:
-
-- **Snowflake Account**: Ensure you have an active Snowflake account in a region where Cortex functionalities are supported. For detailed information, refer to the [Availability Region documentation](https://docs.snowflake.com/en/user-guide/snowflake-cortex/llm-functions#availability).
-- **Private Preview Access**: To try private preview models in Snowflake, you need to contact your Snowflake account team to request access to the private preview feature.
-- **Role Permissions**: ACCOUNTADMIN or equivalent role with permissions to create:
-  - Stages
-  - Databases
-  - Other resources
-- **Python**: Version 3.7 or higher.
-- **Streamlit**: Installed on your local machine.
-- **Snowflake-CLI** : Install snowflake-cli through pip
-- **Model Availability**: `claude-4-sonnet` and `claude-4-opus` is available only in AWS US (cross-region).
-
-## Installation
-
-1. Clone the repository:
-
-   ```bash
-   git clone https://github.com/sgsshankar/Snowflake-AI-Toolkit.git
-   cd snowflake-ai-toolkit
-   ```
-
-2. Install dependencies (only required for local development):
-
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-   All necessary libraries are listed in `requirements.txt`.
-
-## Setup
-
-The application will automatically handle:
-
-- Database creation
-- Stage setup
-- Required resource initialization
-
-Make sure your Snowflake role has the necessary privileges for these operations.
-
-To configure the application mode, update the `mode` parameter in `src/settings_config.json`:
-
-- Set to `"debug"` for local development and editing.
-- Set to `"native"` for running natively in Snowflake.
-
-### Authentication for Cortex Agent – JWT Token Support Only
-
-This app currently supports **only JWT-based authentication** using RSA key pairs for Cortex Agents. OAuth is **not supported** at this time.
-
-#### Step 1: Generate RSA Key Pair
+### Step 2: Clone
 
 ```bash
-openssl genrsa 2048 | openssl pkcs8 -topk8 -inform PEM -out rsa_private_key.p8 -nocrypt
-openssl rsa -in rsa_private_key.p8 -pubout -out rsa_public_key.pub
+git clone https://github.com/wondisha/snowflake-ai-governance.git
+cd snowflake-ai-governance
 ```
 
-#### Step 2: Upload Public Key to Snowflake
+### Step 3: Configure
 
-1. Copy the content from `rsa_public_key.pub` (exclude `-----BEGIN PUBLIC KEY-----` headers).
-2. In Snowflake, run:
+Edit deployment_config.json:
+
+```json
+{
+  "account_id": "YOUR_ACCOUNT_ID",
+  "user": "YOUR_ADMIN_USER",
+  "password": "YOUR_PASSWORD",
+  "warehouse": "COMPUTE_WH",
+  "database": "GOVERNANCE",
+  "schema": "PUBLIC",
+  "role": "ACCOUNTADMIN"
+}
+```
+
+### Step 4: Deploy
+
+```bash
+python deploy.py deployment_config.json
+```
+
+### Step 5: Verify
+
+```bash
+python validate_deployment.py
+```
+
+### Step 6: Launch Dashboard
+
+In Snowsight: Create App → Streamlit → Upload streamlit_governance_dashboard.py
+
+---
+
+## 📋 Full Deployment Steps
+
+### 1. Pre-Deployment Check
+
+```bash
+python verify_setup.py
+```
+
+### 2. Deploy Database
+
+```bash
+python deploy.py deployment_config.json
+```
+
+### 3. Create User Activity Tables
+
+Run in Snowsight:
 
 ```sql
-alter user <your_username> set rsa_public_key='<paste_public_key_here>';
+USE DATABASE GOVERNANCE;
+USE SCHEMA GOVERNANCE;
+
+CREATE TABLE IF NOT EXISTS USER_ACTIVITY_LOG (
+    ACTIVITY_ID STRING PRIMARY KEY,
+    USER_NAME STRING NOT NULL,
+    USER_EMAIL STRING,
+    LAST_LOGIN TIMESTAMP,
+    DAYS_INACTIVE INT,
+    STATUS STRING DEFAULT 'active',
+    CREATED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
+);
+
+CREATE TABLE IF NOT EXISTS ARCHIVED_USERS (
+    ARCHIVE_ID STRING PRIMARY KEY,
+    USER_NAME STRING NOT NULL,
+    USER_EMAIL STRING,
+    ARCHIVED_ON TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
+);
 ```
 
-3. Retrieve the public key fingerprint:
+### 4. Deploy Agent Procedures
 
 ```sql
-desc user <your_username>;
+-- Production (with auto-remediation)
+@file = 'agent_procedures_production.sql'
 ```
 
-Use the fingerprint in `rsa_public_key_fp`.
+### 5. Setup User Removal
 
-#### Step 3: Add to `settings_config.json`
+**Option A: Approval-Based (Safer)**
+```sql
+@file = 'inactive_user_removal.sql'
+```
 
-- Paste full contents of `rsa_private_key.p8` into `rsa_private_key` (add \n).
-- Paste fingerprint into `rsa_public_key_fp`.
+**Option B: Automatic (Faster)**
+```sql
+@file = 'inactive_user_removal_automatic.sql'
+```
 
-For more details, refer to the [Snowflake documentation](https://docs.snowflake.com/en/user-guide/key-pair-auth.html#using-key-pair-authentication).
+### 6. Create RBAC Roles
 
-## Running the App
+```sql
+USE ROLE ACCOUNTADMIN;
+USE DATABASE GOVERNANCE;
 
-### Locally
+CREATE ROLE IF NOT EXISTS governance_admin;
+CREATE ROLE IF NOT EXISTS governance_agent;
+CREATE ROLE IF NOT EXISTS governance_viewer;
 
-Launch the application locally using:
+GRANT USAGE ON DATABASE GOVERNANCE TO ROLE governance_admin;
+GRANT USAGE ON SCHEMA GOVERNANCE TO ROLE governance_admin;
+GRANT ALL ON ALL TABLES IN SCHEMA GOVERNANCE TO ROLE governance_admin;
+
+GRANT ROLE governance_admin TO USER "your_email@company.com";
+```
+
+### 7. Schedule Agents
+
+```sql
+USE DATABASE GOVERNANCE;
+USE SCHEMA GOVERNANCE;
+
+-- Performance Agent (every 2 hours)
+CREATE TASK performance_agent_task
+  WAREHOUSE = COMPUTE_WH
+  SCHEDULE = 'USING CRON 0 */2 * * * UTC'
+AS CALL GOVERNANCE.GOVERNANCE.PERFORMANCE_AGENT();
+
+-- Cost Agent (daily 6 AM)
+CREATE TASK cost_agent_task
+  WAREHOUSE = COMPUTE_WH
+  SCHEDULE = 'USING CRON 0 6 * * * UTC'
+AS CALL GOVERNANCE.GOVERNANCE.COST_AGENT();
+
+-- Security Agent (every 4 hours)
+CREATE TASK security_agent_task
+  WAREHOUSE = COMPUTE_WH
+  SCHEDULE = 'USING CRON 0 */4 * * * UTC'
+AS CALL GOVERNANCE.GOVERNANCE.SECURITY_AGENT();
+
+-- Health Agent (every hour)
+CREATE TASK health_agent_task
+  WAREHOUSE = COMPUTE_WH
+  SCHEDULE = 'USING CRON 0 * * * * UTC'
+AS CALL GOVERNANCE.GOVERNANCE.HEALTH_AGENT();
+
+-- Spillage Agent (every 4 hours)
+CREATE TASK spillage_agent_task
+  WAREHOUSE = COMPUTE_WH
+  SCHEDULE = 'USING CRON 0 */4 * * * UTC'
+AS CALL GOVERNANCE.GOVERNANCE.SPILLAGE_AGENT();
+
+-- Enable all tasks
+ALTER TASK performance_agent_task RESUME;
+ALTER TASK cost_agent_task RESUME;
+ALTER TASK security_agent_task RESUME;
+ALTER TASK health_agent_task RESUME;
+ALTER TASK spillage_agent_task RESUME;
+```
+
+### 8. Optional: Setup Integrations
+
+**Slack Alerts:**
+```sql
+@file = 'slack_integration.sql'
+```
+
+**Email Reports:**
+```sql
+@file = 'daily_reports.sql'
+```
+
+**Approval Workflows:**
+```sql
+@file = 'approval_workflow.sql'
+```
+
+### 9. Deploy Dashboard
+
+1. In Snowsight: Click "+ Create" → "Streamlit app"
+2. Paste content from streamlit_governance_dashboard.py
+3. Save
+4. Navigate to "Inactive Users" tab
+
+### 10. Load Sample Data (Optional)
 
 ```bash
-streamlit run streamlit_app.py
+python populate_sample_data.py
 ```
 
-### Natively on Snowflake
+---
 
-To deploy the application natively in Snowflake, use the following command:
+## 📊 Dashboard Pages
+
+**Overview** - System metrics & audit logs  
+**Security** - PII detection, security events  
+**Performance** - Query analysis, warehouse metrics  
+**Cost** - Credit tracking, cost per warehouse  
+**Health** - Warehouse health status  
+**Incidents** - Active incidents & remediation  
+**Agents** - Agent status & performance  
+**Inactive Users** - User management with action buttons:
+  - Disable User
+  - Revoke Roles
+  - Archive & Remove
+
+---
+
+## 🔐 User Lifecycle Management
+
+### Automatic Detection (Weekly Monday Midnight)
+
+Scans for users inactive 90+ days and removes them
+
+### Approval-Based Removal
+
+```sql
+@file = 'inactive_user_removal.sql'
+```
+
+Process: Flag → Approval Request → Admin Review → Auto-Remove
+
+### Automatic Removal (No Approval)
+
+```sql
+@file = 'inactive_user_removal_automatic.sql'
+```
+
+Each Monday: Scan → Revoke Roles → Disable → Archive → Log
+
+---
+
+## 🔗 Integration Guides
+
+- **Airflow:** See AIRFLOW_INTEGRATION_GUIDE.md
+- **dbt Cloud:** See DBT_CLOUD_INTEGRATION_GUIDE.md
+- **Slack:** Update webhook URL in slack_integration.sql
+- **Email:** Configure service in daily_reports.sql
+
+---
+
+## 📈 Monitoring
+
+### Check Agent Status
+
+```sql
+SELECT * FROM GOVERNANCE.GOVERNANCE.AGENT_STATE
+ORDER BY LAST_SUCCESSFUL_EXECUTION DESC;
+```
+
+### View Audit Logs
+
+```sql
+SELECT * FROM GOVERNANCE.GOVERNANCE.AUDIT_LOGS
+ORDER BY EVENT_TIMESTAMP DESC LIMIT 50;
+```
+
+### Monitor Tasks
+
+```sql
+SELECT NAME, STATE, NEXT_SCHEDULED_TIME
+FROM TABLE(INFORMATION_SCHEMA.TASK_HISTORY())
+WHERE SCHEMA_NAME = 'GOVERNANCE'
+ORDER BY QUERY_START_TIME DESC;
+```
+
+---
+
+## 📁 File Structure
+
+```
+deploy.py                           # Main deployment
+validate_deployment.py              # Validation
+verify_setup.py                     # Pre-checks
+populate_sample_data.py             # Sample data
+streamlit_governance_dashboard.py   # Dashboard
+governance_agents_dag.py            # Airflow DAG
+src/database/schema.sql             # Schema
+agent_procedures.sql                # Mock agents
+agent_procedures_production.sql     # Prod agents
+inactive_user_removal.sql           # Approval-based
+inactive_user_removal_automatic.sql # Automatic
+create_inactive_users_tables.sql    # User tables
+slack_integration.sql               # Slack
+approval_workflow.sql               # Approvals
+daily_reports.sql                   # Reports
+environment_deployment.sql          # Multi-env
+IMPLEMENTATION_GUIDE.md
+AIRFLOW_INTEGRATION_GUIDE.md
+DBT_CLOUD_INTEGRATION_GUIDE.md
+README.md
+```
+
+---
+
+## ✅ What You Get
+
+✅ 5 Autonomous Agents  
+✅ 8-Page Real-Time Dashboard  
+✅ Slack Alerts  
+✅ Daily Email Reports  
+✅ Approval Workflows  
+✅ Automatic User Removal  
+✅ Complete RBAC  
+✅ Multi-Environment Support  
+✅ Full Audit Logging  
+✅ Production-Ready  
+
+---
+
+## 🚀 Deployment Timeline
+
+| Stage | Time | What Happens |
+|-------|------|--------------|
+| Verify Setup | 1 min | Check dependencies |
+| Deploy DB | 2 min | Create schema, tables, views |
+| Deploy Agents | 1 min | Create procedures |
+| Setup RBAC | 1 min | Create roles & permissions |
+| Schedule Tasks | 1 min | Create Snowflake tasks |
+| Deploy Dashboard | 2 min | Upload Streamlit app |
+| **Total** | **~8 min** | **Complete System Live** |
+
+---
+
+## 📞 Support
+
+- Documentation: See IMPLEMENTATION_GUIDE.md
+- Issues: GitHub Issues
+- Questions: Check troubleshooting section
+
+---
+
+## 🎯 Ready to Deploy?
 
 ```bash
-snow streamlit deploy --account "<your_account>" --user "<your_username>" --password "<your_password>" --role "<your_role>" --warehouse "<your_warehouse>" --database "<your_database>" --replace
+# 1. Clone
+git clone https://github.com/wondisha/snowflake-ai-governance.git
+
+# 2. Configure
+# Edit deployment_config.json
+
+# 3. Deploy
+python deploy.py deployment_config.json
+
+# 4. Done! 🎉
 ```
 
-Replace the placeholders (`<your_account>`, `<your_username>`, etc.) with your actual Snowflake account details. When running natively in Snowflake, installing dependencies from `requirements.txt` is not needed.
+**Your autonomous governance system is now LIVE!** 🚀
 
-## Project Structure
+---
 
-| File/Directory                                             | Description                          |
-| ---------------------------------------------------------- | ------------------------------------ |
-| [src/](src/)                                               | Source code for setup and styling    |
-| [src/setup.py](src/setup.py)                               | Setup and initialization code        |
-| [src/styles.css](src/styles.css)                           | Custom styling                       |
-| [src/build.py](src/build.py)                               | Build mode functionality             |
-| [src/cortex_functions.py](src/cortex_functions.py)         | Core functions for Cortex operations |
-| [src/query_result_builder.py](src/query_result_builder.py) | Query result handling and display    |
-| [src/playground.py](src/playground.py)                     | Playground mode functionality        |
-| [src/rag.py](src/rag.py)                                   | RAG mode functionality               |
-| [src/fine_tune.py](src/fine_tune.py)                       | Fine-tuning functionality            |
-| [src/search.py](src/search.py)                             | Cortex Search Functionality          |
-| [.gitignore](.gitignore)                                   | Git ignore file                      |
-| [requirements.txt](requirements.txt)                       | Project dependencies                 |
-| [streamlit_app.py](streamlit_app.py)                       | Main application entry point         |
-
-## Troubleshooting
-
-Common issues and solutions:
-
-1. **Snowflake Permission Errors**
-
-   - Verify role privileges for database and stage creation
-   - Ensure Cortex functionalities are enabled
-
-2. **Dependency Issues**
-
-   - If pandas/pyarrow installation fails:
-     ```bash
-     pip install pandas pyarrow
-     ```
-
-3. **Connection Issues**
-   - Verify Snowflake account credentials
-   - Check network connectivity
-   - Ensure proper role assignments
-
-## Contributing
-
-We welcome contributions! Please:
-
-1. Fork the repository
-2. Create a feature branch
-3. Submit a pull request
-
-## Support
-
-For assistance:
-
-- Open an issue in the GitHub repository
-- Contact project maintainers
-- Check documentation for common solutions
-
-## Warranty
-
-The Software is provided as Open Source. This software is provided “as is” and any express or implied warranties, including, but not limited to, the implied warranties of merchantability and fitness for a particular purpose are disclaimed. In no event shall the owner or contributors be liable for any direct, indirect, incidental, special, exemplary, or consequential damages (including, but not limited to, procurement of substitute goods or services; loss of use, data, or profits; or business interruption) however caused and on any theory of liability, whether in contract, strict liability, or tort (including negligence or otherwise) arising in any way out of the use of this software, even if advised of the possibility of such damage.
-
-## Legal
-
-Licensed under the Apache License, Version 2.0 (the "License"); you may not use this tool except in compliance with the License. You may obtain a copy of the License at: http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
-
-This is an Open Source repository and not an official Snowflake offering. This tool is not endorsed by Snowflake or any of the previous or current employers of the developers.
-
-## Trademarks
-
-This project may contain trademarks or logos for projects, products, or services. SNOWFLAKE is a trademark of Snowflake Computing, Inc in the United States and/or other countries. Any use of third-party trademarks or logos are subject to those third-party's policies.
+Made with ❤️ for Snowflake
