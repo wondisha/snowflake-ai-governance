@@ -340,13 +340,8 @@ elif page == "Agents":
     except:
         st.warning("Could not load agent status")
 
-
-# Sidebar navigation
-st.sidebar.title("Navigation")
-page = st.sidebar.radio(
-    "Select Dashboard",
-    ["Overview", "Security", "Performance", "Cost", "Health", "Incidents", "Agents"]
-)
+st.divider()
+st.markdown("**Snowflake Governance Dashboard** | Real-time monitoring")
 
 # ============================================================================
 # OVERVIEW PAGE
