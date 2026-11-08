@@ -35,13 +35,19 @@ st.markdown("**Real-time monitoring of governance, security, performance, and he
 # Get Snowflake session
 @st.cache_resource
 def get_session():
-    return Session.builder.configs(st.secrets["snowflake"]).create()
+    try:
+        # In Snowsight, use default connection
+        return Session.builder.create()
+    except:
+        # For local testing, use secrets
+        return Session.builder.configs(st.secrets["snowflake"]).create()
 
 try:
     session = get_session()
-    st.success("✅ Connected to Snowflake")
+    st.success("✅ Connected to Snowflake (GOVERNANCE database)")
 except Exception as e:
-    st.error(f"❌ Connection failed: {str(e)}")
+    st.error(f"❌ Connection failed: {str(e)[:200]}")
+    st.info("💡 Tip: This app works best in Snowsight. For local testing, create a secrets.toml file.")
     st.stop()
 
 # Sidebar navigation
