@@ -4,51 +4,342 @@ Runs natively in Snowsight
 """
 
 import streamlit as st
-from snowflake.snowpark.session import Session
 import pandas as pd
-from datetime import datetime, timedelta
+from snowflake.snowpark.context import get_active_session
 
 # Page config
 st.set_page_config(
     page_title="Snowflake Governance Dashboard",
     page_icon="🛡️",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    layout="wide"
 )
-
-# Custom CSS
-st.markdown("""
-    <style>
-    .metric-card {
-        background-color: #f0f2f6;
-        padding: 20px;
-        border-radius: 5px;
-        margin: 10px 0;
-    }
-    </style>
-""", unsafe_allow_html=True)
 
 # Header
 st.title("🛡️ Snowflake Governance Dashboard")
 st.markdown("**Real-time monitoring of governance, security, performance, and health**")
 
-# Get Snowflake session
-@st.cache_resource
-def get_session():
-    try:
-        # In Snowsight, use default connection
-        return Session.builder.create()
-    except:
-        # For local testing, use secrets
-        return Session.builder.configs(st.secrets["snowflake"]).create()
-
+# Get session - Snowsight handles this automatically
 try:
-    session = get_session()
-    st.success("✅ Connected to Snowflake (GOVERNANCE database)")
+    session = get_active_session()
+    st.success("✅ Connected to Snowflake GOVERNANCE database")
 except Exception as e:
-    st.error(f"❌ Connection failed: {str(e)[:200]}")
-    st.info("💡 Tip: This app works best in Snowsight. For local testing, create a secrets.toml file.")
+    st.error(f"Connection error: {str(e)}")
     st.stop()
+
+# Sidebar navigation
+st.sidebar.title("Navigation")
+page = st.sidebar.radio(
+    "Select Dashboard",
+    ["Overview", "Security", "Performance", "Cost", "Health", "Incidents", "Agents"]
+)
+
+# ============================================================================
+# OVERVIEW PAGE
+# ============================================================================
+if page == "Overview":
+    st.header("System Overview")
+
+    col1, col2, col3, col4 = st.columns(4)
+
+    try:
+        # Total policies
+        result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.POLICIES").collect()
+        col1.metric("Active Policies", result[0]['COUNT'])
+    except:
+        col1.metric("Active Policies", "—")
+
+    try:
+        # Security rules
+        result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.SECURITY_RULES").collect()
+        col2.metric("Security Rules", result[0]['COUNT'])
+    except:
+        col2.metric("Security Rules", "—")
+
+    try:
+        # Open incidents
+        result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.INCIDENTS WHERE STATUS IN ('open', 'in_progress')").collect()
+        col3.metric("Open Incidents", result[0]['COUNT'])
+    except:
+        col3.metric("Open Incidents", "—")
+
+    try:
+        # Pending approvals
+        result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.APPROVAL_REQUESTS WHERE STATUS = 'pending'").collect()
+        col4.metric("Pending Approvals", result[0]['COUNT'])
+    except:
+        col4.metric("Pending Approvals", "—")
+
+    st.divider()
+
+    # Recent audit logs
+    st.subheader("Recent Audit Logs")
+    try:
+        df = session.sql("""
+            SELECT
+                EVENT_TYPE,
+                EVENT_CATEGORY,
+                RESOURCE_TYPE,
+                RESOURCE_NAME,
+                ACTOR_EMAIL,
+                EVENT_TIMESTAMP,
+                STATUS
+            FROM GOVERNANCE.AUDIT_LOGS
+            ORDER BY EVENT_TIMESTAMP DESC
+            LIMIT 10
+        """).to_pandas()
+        st.dataframe(df, use_container_width=True)
+    except Exception as e:
+        st.warning(f"Could not load audit logs")
+
+    # Agent health
+    st.subheader("Agent Health Status")
+    try:
+        df = session.sql("""
+            SELECT
+                AGENT_NAME,
+                AGENT_TYPE,
+                EXECUTION_STATUS,
+                LAST_SUCCESSFUL_EXECUTION,
+                ERROR_COUNT,
+                IS_ENABLED
+            FROM GOVERNANCE.AGENT_STATE
+            ORDER BY LAST_SUCCESSFUL_EXECUTION DESC
+        """).to_pandas()
+        st.dataframe(df, use_container_width=True)
+    except:
+        st.warning("Could not load agent health")
+
+# ============================================================================
+# SECURITY PAGE
+# ============================================================================
+elif page == "Security":
+    st.header("🔒 Security & Compliance")
+
+    col1, col2, col3 = st.columns(3)
+
+    try:
+        result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.SECURITY_RULES WHERE ENABLED = TRUE").collect()
+        col1.metric("Enabled Rules", result[0]['COUNT'])
+    except:
+        col1.metric("Enabled Rules", "—")
+
+    try:
+        result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.PII_DETECTIONS WHERE STATUS = 'detected'").collect()
+        col2.metric("PII Detections", result[0]['COUNT'])
+    except:
+        col2.metric("PII Detections", "—")
+
+    try:
+        result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.AUDIT_LOGS WHERE EVENT_CATEGORY = 'security'").collect()
+        col3.metric("Security Events", result[0]['COUNT'])
+    except:
+        col3.metric("Security Events", "—")
+
+    st.divider()
+
+    st.subheader("PII Detection Records")
+    try:
+        df = session.sql("""
+            SELECT
+                DATABASE_NAME,
+                SCHEMA_NAME,
+                TABLE_NAME,
+                COLUMN_NAME,
+                PII_TYPE,
+                CONFIDENCE_SCORE,
+                STATUS
+            FROM GOVERNANCE.PII_DETECTIONS
+            ORDER BY DETECTED_AT DESC
+            LIMIT 20
+        """).to_pandas()
+        st.dataframe(df, use_container_width=True)
+    except:
+        st.warning("Could not load PII detections")
+
+# ============================================================================
+# PERFORMANCE PAGE
+# ============================================================================
+elif page == "Performance":
+    st.header("⚡ Performance Optimization")
+
+    col1, col2, col3 = st.columns(3)
+
+    try:
+        result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.QUERY_ANALYSIS WHERE IS_OPTIMIZABLE = TRUE").collect()
+        col1.metric("Optimizable Queries", result[0]['COUNT'])
+    except:
+        col1.metric("Optimizable Queries", "—")
+
+    try:
+        result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.PERFORMANCE_THRESHOLDS WHERE ENABLED = TRUE").collect()
+        col2.metric("Active Thresholds", result[0]['COUNT'])
+    except:
+        col2.metric("Active Thresholds", "—")
+
+    try:
+        result = session.sql("SELECT AVG(EXECUTION_TIME_SECONDS) as avg_time FROM GOVERNANCE.QUERY_ANALYSIS").collect()
+        avg_time = result[0]['AVG_TIME']
+        col3.metric("Avg Query Time", f"{avg_time:.2f}s" if avg_time else "—")
+    except:
+        col3.metric("Avg Query Time", "—")
+
+    st.divider()
+
+    st.subheader("Query Performance Analysis")
+    try:
+        df = session.sql("""
+            SELECT
+                QUERY_ID,
+                WAREHOUSE_NAME,
+                USER_EMAIL,
+                EXECUTION_TIME_SECONDS,
+                DATA_SCANNED_GB,
+                PERFORMANCE_SCORE,
+                IS_OPTIMIZABLE
+            FROM GOVERNANCE.QUERY_ANALYSIS
+            ORDER BY ANALYSIS_TIMESTAMP DESC
+            LIMIT 20
+        """).to_pandas()
+        st.dataframe(df, use_container_width=True)
+    except:
+        st.warning("Could not load query analysis")
+
+# ============================================================================
+# COST PAGE
+# ============================================================================
+elif page == "Cost":
+    st.header("💰 Cost Tracking & Optimization")
+
+    col1, col2, col3 = st.columns(3)
+
+    try:
+        result = session.sql("SELECT SUM(CREDITS_USED) as total FROM GOVERNANCE.COST_TRACKING WHERE RECORDED_AT >= CURRENT_TIMESTAMP() - INTERVAL '7 days'").collect()
+        total = result[0]['TOTAL']
+        col1.metric("Credits (7 days)", f"{total:.2f}" if total else "—")
+    except:
+        col1.metric("Credits (7 days)", "—")
+
+    try:
+        result = session.sql("SELECT COUNT(DISTINCT WAREHOUSE_NAME) as count FROM GOVERNANCE.COST_TRACKING").collect()
+        col2.metric("Active Warehouses", result[0]['COUNT'])
+    except:
+        col2.metric("Active Warehouses", "—")
+
+    try:
+        result = session.sql("SELECT COUNT(DISTINCT USER_EMAIL) as count FROM GOVERNANCE.COST_TRACKING").collect()
+        col3.metric("Active Users", result[0]['COUNT'])
+    except:
+        col3.metric("Active Users", "—")
+
+    st.divider()
+
+    st.subheader("Cost Summary by Warehouse")
+    try:
+        df = session.sql("""
+            SELECT
+                WAREHOUSE_NAME,
+                COUNT(*) as query_count,
+                SUM(CREDITS_USED) as total_credits,
+                AVG(EXECUTION_TIME_SECONDS) as avg_time
+            FROM GOVERNANCE.COST_TRACKING
+            WHERE RECORDED_AT >= CURRENT_TIMESTAMP() - INTERVAL '30 days'
+            GROUP BY WAREHOUSE_NAME
+            ORDER BY TOTAL_CREDITS DESC
+        """).to_pandas()
+        st.dataframe(df, use_container_width=True)
+    except:
+        st.warning("Could not load cost summary")
+
+# ============================================================================
+# HEALTH PAGE
+# ============================================================================
+elif page == "Health":
+    st.header("❤️ Warehouse Health")
+
+    try:
+        df = session.sql("""
+            SELECT
+                WAREHOUSE_NAME,
+                METRIC_TIMESTAMP,
+                CPU_PERCENT,
+                MEMORY_PERCENT,
+                HEALTH_STATUS
+            FROM GOVERNANCE.WAREHOUSE_HEALTH
+            ORDER BY METRIC_TIMESTAMP DESC
+            LIMIT 20
+        """).to_pandas()
+        st.dataframe(df, use_container_width=True)
+    except:
+        st.warning("Could not load warehouse health")
+
+# ============================================================================
+# INCIDENTS PAGE
+# ============================================================================
+elif page == "Incidents":
+    st.header("🚨 Incidents & Issues")
+
+    col1, col2, col3 = st.columns(3)
+
+    try:
+        result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.INCIDENTS WHERE STATUS IN ('open', 'in_progress')").collect()
+        col1.metric("Active Incidents", result[0]['COUNT'])
+    except:
+        col1.metric("Active Incidents", "—")
+
+    try:
+        result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.INCIDENTS WHERE SEVERITY = 'critical'").collect()
+        col2.metric("Critical", result[0]['COUNT'])
+    except:
+        col2.metric("Critical", "—")
+
+    try:
+        result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.REMEDIATION_ACTIONS WHERE STATUS = 'success'").collect()
+        col3.metric("Resolved", result[0]['COUNT'])
+    except:
+        col3.metric("Resolved", "—")
+
+    st.divider()
+
+    st.subheader("Open Incidents")
+    try:
+        df = session.sql("""
+            SELECT
+                INCIDENT_ID,
+                SEVERITY,
+                CATEGORY,
+                DESCRIPTION,
+                DETECTED_TIMESTAMP,
+                STATUS
+            FROM GOVERNANCE.INCIDENTS
+            WHERE STATUS IN ('open', 'in_progress')
+            ORDER BY DETECTED_TIMESTAMP DESC
+        """).to_pandas()
+        st.dataframe(df, use_container_width=True)
+    except:
+        st.warning("Could not load incidents")
+
+# ============================================================================
+# AGENTS PAGE
+# ============================================================================
+elif page == "Agents":
+    st.header("🤖 Governance Agents")
+
+    st.subheader("Agent Status")
+    try:
+        df = session.sql("""
+            SELECT
+                AGENT_NAME,
+                AGENT_TYPE,
+                EXECUTION_STATUS,
+                ERROR_COUNT,
+                IS_ENABLED
+            FROM GOVERNANCE.AGENT_STATE
+            ORDER BY AGENT_TYPE, AGENT_NAME
+        """).to_pandas()
+        st.dataframe(df, use_container_width=True)
+    except:
+        st.warning("Could not load agent status")
+
 
 # Sidebar navigation
 st.sidebar.title("Navigation")
