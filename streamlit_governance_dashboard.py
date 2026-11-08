@@ -31,7 +31,7 @@ except Exception as e:
 
 # Sidebar navigation
 st.sidebar.title("Navigation")
-page = st.sidebar.radio(
+page = st.sidebar.selectbox(
     "Select Dashboard",
     ["Overview", "Security", "Performance", "Cost", "Health", "Incidents", "Agents", "Inactive Users"]
 )
