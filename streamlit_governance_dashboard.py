@@ -33,7 +33,7 @@ except Exception as e:
 st.sidebar.title("Navigation")
 page = st.sidebar.radio(
     "Select Dashboard",
-    ["Overview", "Security", "Performance", "Cost", "Health", "Incidents", "Agents"]
+    ["Overview", "Security", "Performance", "Cost", "Health", "Incidents", "Agents", "Inactive Users"]
 )
 
 # ============================================================================
@@ -708,6 +708,151 @@ elif page == "Agents":
         st.dataframe(df, use_container_width=True)
     except Exception as e:
         st.warning(f"Could not load agent performance: {str(e)[:100]}")
+
+# ============================================================================
+# INACTIVE USERS PAGE
+# ============================================================================
+elif page == "Inactive Users":
+    st.header("👤 Inactive User Management (90+ Days)")
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        try:
+            result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.GOVERNANCE.USER_ACTIVITY_LOG WHERE DAYS_INACTIVE >= 90").collect()
+            st.metric("Inactive Users (90+)", result[0]['COUNT'])
+        except:
+            st.metric("Inactive Users (90+)", "—")
+
+    with col2:
+        try:
+            result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.GOVERNANCE.USER_ACTIVITY_LOG WHERE STATUS = 'flagged'").collect()
+            st.metric("Flagged for Removal", result[0]['COUNT'])
+        except:
+            st.metric("Flagged for Removal", "—")
+
+    with col3:
+        try:
+            result = session.sql("SELECT COUNT(*) as count FROM GOVERNANCE.GOVERNANCE.ARCHIVED_USERS").collect()
+            st.metric("Archived Users", result[0]['COUNT'])
+        except:
+            st.metric("Archived Users", "—")
+
+    st.divider()
+
+    # Inactive Users Table
+    st.subheader("Inactive Users (90+ Days)")
+    try:
+        df = session.sql("""
+            SELECT
+                USER_NAME,
+                USER_EMAIL,
+                DAYS_INACTIVE,
+                STATUS,
+                FLAGGED_FOR_REMOVAL,
+                LAST_LOGIN,
+                REMOVAL_SCHEDULED
+            FROM GOVERNANCE.GOVERNANCE.USER_ACTIVITY_LOG
+            WHERE DAYS_INACTIVE >= 90
+            ORDER BY DAYS_INACTIVE DESC
+        """).to_pandas()
+
+        if len(df) > 0:
+            st.dataframe(df, use_container_width=True)
+
+            # Action buttons for each user
+            st.subheader("User Actions")
+            selected_user = st.selectbox(
+                "Select user to take action",
+                df['USER_NAME'].tolist() if len(df) > 0 else [],
+                key="inactive_user_select"
+            )
+
+            col1, col2, col3 = st.columns(3)
+
+            with col1:
+                if st.button("🔴 Disable User", key="disable_btn"):
+                    try:
+                        session.sql(f"CALL GOVERNANCE.GOVERNANCE.DISABLE_INACTIVE_USER('{selected_user}', 'Manual disable via dashboard')").collect()
+                        st.success(f"✅ User {selected_user} disabled successfully")
+                    except Exception as e:
+                        st.error(f"Error: {str(e)[:100]}")
+
+            with col2:
+                if st.button("🗑️ Revoke Roles", key="revoke_btn"):
+                    try:
+                        session.sql(f"CALL GOVERNANCE.GOVERNANCE.REVOKE_INACTIVE_USER_ROLES('{selected_user}')").collect()
+                        st.success(f"✅ Roles revoked for {selected_user}")
+                    except Exception as e:
+                        st.error(f"Error: {str(e)[:100]}")
+
+            with col3:
+                if st.button("⚙️ Archive & Remove", key="remove_btn"):
+                    try:
+                        session.sql(f"CALL GOVERNANCE.GOVERNANCE.REMOVE_INACTIVE_USER_COMPLETE('{selected_user}')").collect()
+                        st.success(f"✅ User {selected_user} completely removed")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error: {str(e)[:100]}")
+        else:
+            st.info("✅ No inactive users found!")
+
+    except Exception as e:
+        st.warning(f"Could not load inactive users: {str(e)[:100]}")
+
+    st.divider()
+
+    # Archived Users History
+    st.subheader("Archived Users History")
+    try:
+        df = session.sql("""
+            SELECT
+                USER_NAME,
+                USER_EMAIL,
+                CREATED_ON,
+                LAST_LOGIN,
+                ARCHIVED_ON
+            FROM GOVERNANCE.GOVERNANCE.ARCHIVED_USERS
+            ORDER BY ARCHIVED_ON DESC
+            LIMIT 20
+        """).to_pandas()
+
+        if len(df) > 0:
+            st.dataframe(df, use_container_width=True)
+        else:
+            st.info("No archived users yet")
+
+    except Exception as e:
+        st.warning(f"Could not load archived users: {str(e)[:100]}")
+
+    st.divider()
+
+    # Pending Removal Requests
+    st.subheader("Pending Removal Approval Requests")
+    try:
+        df = session.sql("""
+            SELECT
+                REQUEST_ID,
+                RESOURCE_NAME as USER_NAME,
+                DESCRIPTION,
+                RISK_LEVEL,
+                STATUS,
+                REQUEST_CREATED_AT,
+                REQUEST_EXPIRES_AT,
+                APPROVAL_NEEDED_COUNT,
+                APPROVALS_RECEIVED_COUNT
+            FROM GOVERNANCE.GOVERNANCE.APPROVAL_REQUESTS
+            WHERE REQUEST_TYPE = 'user_removal'
+            ORDER BY REQUEST_CREATED_AT DESC
+        """).to_pandas()
+
+        if len(df) > 0:
+            st.dataframe(df, use_container_width=True)
+        else:
+            st.info("No pending removal requests")
+
+    except Exception as e:
+        st.warning(f"Could not load removal requests: {str(e)[:100]}")
 
 # Footer
 st.divider()
