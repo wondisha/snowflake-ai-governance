@@ -1,0 +1,14 @@
+definition_version: 1
+
+projects:
+  - name: snowflake-governance
+    database: GOVERNANCE
+    warehouse: COMPUTE_WH
+    schema: PUBLIC
+
+    entities:
+      streamlit:
+        - path: streamlit_governance_dashboard.py
+          name: governance_dashboard
+          title: Snowflake Governance Dashboard
+          comment: Real-time monitoring of governance, security, performance, and health
