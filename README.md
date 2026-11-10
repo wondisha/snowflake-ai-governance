@@ -58,6 +58,21 @@ An **enterprise-grade autonomous governance system** for Snowflake that automati
 
 ---
 
+## 🧪 Learn with Hands-On Lab (NEW!)
+
+**Want to learn how to build this system?** 📚
+
+Start with our **Hands-On Lab Guide**: `HANDS_ON_LAB.md`
+- 6 comprehensive modules (4-6 hours)
+- Step-by-step exercises with checkpoints
+- Copy-paste ready SQL code
+- Troubleshooting guide included
+- Perfect for learning Snowflake automation
+
+**[Start the Lab →](HANDS_ON_LAB.md)**
+
+---
+
 ## 🚀 Quick Start (5 Minutes)
 
 ### Step 1: Prerequisites
