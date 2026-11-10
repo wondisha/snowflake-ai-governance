@@ -300,10 +300,11 @@ Each Monday: Scan → Revoke Roles → Disable → Archive → Log
 
 ---
 
-## 🔗 Integration Guides
+## 🔗 Integration & Setup Guides
 
 - **Airflow:** See AIRFLOW_INTEGRATION_GUIDE.md
 - **dbt Cloud:** See DBT_CLOUD_INTEGRATION_GUIDE.md
+- **Inactive User Management:** See INACTIVE_USER_MANAGEMENT_SETUP.md (Complete setup guide with procedures)
 - **Slack:** Update webhook URL in slack_integration.sql
 - **Email:** Configure service in daily_reports.sql
 
